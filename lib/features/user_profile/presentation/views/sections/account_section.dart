@@ -129,8 +129,17 @@ class _AvatarBlock extends StatelessWidget {
         color: const Color(0xFFE9FBFA),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Center(
-        child: Icon(Icons.person, size: 96, color: Color(0xFF17C9BD)),
+      child: Center(
+        child: initials.isNotEmpty
+            ? Text(
+                initials,
+                style: const TextStyle(
+                  fontSize: 48,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF17C9BD),
+                ),
+              )
+            : const Icon(Icons.person, size: 96, color: Color(0xFF17C9BD)),
       ),
     );
   }
