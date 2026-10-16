@@ -307,7 +307,9 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     onSubmitted: (_) => _handleSend(),
                   ),
                 ),
-                if (_controller.text.isEmpty && !_isRecording)
+                if (_controller.text.isEmpty &&
+                    _attachedFiles.isEmpty &&
+                    !_isRecording)
                   IconButton(
                     onPressed: _startRecording,
                     icon: Icon(Icons.mic_none, color: colors.textHint),
@@ -333,6 +335,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     onPressed: _handleSend,
                     icon: Icon(Icons.send, color: colors.primary),
                     splashRadius: 20,
+                    tooltip: 'Send message',
                   ),
               ],
             ),
