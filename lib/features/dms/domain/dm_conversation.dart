@@ -35,6 +35,26 @@ class DmConversation {
 
   String get displayName => username.isNotEmpty ? username : 'Unknown';
 
+    /// The @handle for this conversation, derived once so every surface that
+    /// shows it agrees.
+    ///
+    /// `displayName` only falls back when [username] is empty, so a username of
+    /// nothing but whitespace reaches here intact. Splitting that produced two
+    /// different results: the chat header filtered the empty parts and fell back
+    /// to `@user`, while the profile card kept the single empty part and
+    /// rendered a bare `@`. Both now read this getter.
+    String get dmHandle {
+      final parts = displayName
+          .trim()
+          .split(RegExp(r'\s+'))
+          .where((part) => part.isNotEmpty)
+          .toList();
+
+      if (parts.isEmpty) return '@user';
+      if (parts.length == 1) return '@${parts.first}';
+      return '@${parts.first}_${parts.last}';
+    }
+
   String? get effectiveAvatarUrl => (avatarUrl != null && avatarUrl!.isNotEmpty)
       ? avatarUrl
       : defaultAvatarUrl;

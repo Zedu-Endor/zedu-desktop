@@ -14,17 +14,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   bool _isDragging = false;
   final _composerKey = GlobalKey<DmMessageComposerState>();
 
-  String get _recipientHandle {
-    final parts = widget.conversation.displayName
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) return '@user';
-    if (parts.length == 1) return '@${parts.first}';
-    return '@${parts.first}_${parts.last}';
-  }
+  String get _recipientHandle => widget.conversation.dmHandle;
 
   @override
   Widget build(BuildContext context) {
