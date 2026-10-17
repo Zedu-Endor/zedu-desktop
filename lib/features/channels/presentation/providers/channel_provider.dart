@@ -36,20 +36,25 @@ class ChannelState {
 class ChannelNotifier extends Notifier<ChannelState> {
   @override
   ChannelState build() {
+    ref.watch(channelScopeProvider);
     // Schedule fetch after build
-    Future.microtask(fetchChannels);
+    Future.microtask(() {
+      if (ref.mounted) fetchChannels();
+    });
     return const ChannelState();
   }
 
   Future<void> fetchChannels() async {
-    final workspaceState = ref.read(workspaceProvider);
-    final String? orgId = workspaceState.selectedWorkspace?.id;
+    final scope = ref.read(channelScopeProvider);
+    final orgId = scope?.workspaceId;
     if (orgId == null) return;
 
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     final repository = ref.read(channelRepositoryProvider);
     final result = await repository.fetchChannels(orgId);
+
+    if (!ref.mounted || ref.read(channelScopeProvider) != scope) return;
 
     if (result is Success<List<Channel>>) {
       state = state.copyWith(isLoading: false, channels: result.value);

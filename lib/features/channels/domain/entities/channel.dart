@@ -25,7 +25,8 @@ class Channel {
 
   factory Channel.fromJson(Map<String, dynamic> json) {
     return Channel(
-      id: json['id'] as String? ?? '',
+      // Channel API responses use channels_id; retain id for existing payloads.
+      id: json['channels_id'] as String? ?? json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       organisationId: json['organisation_id'] as String? ?? '',

@@ -44,8 +44,12 @@ class WorkspaceSwitcherHeader extends ConsumerWidget {
             ),
           ),
           IconButton(
+            tooltip: 'Create channel',
             onPressed: () {
-              // Add action
+              showDialog<void>(
+                context: context,
+                builder: (_) => const CreateChannelModal(),
+              );
             },
             icon: Icon(
               Icons.add,
