@@ -10,10 +10,7 @@ class DmProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final name = conversation.displayName;
-    final nameParts = name.trim().split(RegExp(r'\s+'));
-    final handle = nameParts.length > 1
-        ? '@${nameParts.first}_${nameParts.last}'
-        : '@${nameParts.first}';
+    final handle = conversation.dmHandle;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 76, 40, 0),
