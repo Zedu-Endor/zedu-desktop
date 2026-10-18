@@ -20,6 +20,7 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
   }
 
   Future<void> _onGeneratePressed() async {
+    if (ref.read(magicLinkNotifierProvider).isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     final email = _emailController.text.trim();
@@ -88,6 +89,7 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
                       hint: 'Enter your email',
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _onGeneratePressed(),
                       validator: (value) =>
                           Validators.validateEmail(context, value),
                     ),
