@@ -142,7 +142,7 @@ class WorkspaceSwitcherList extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  '${workspace.membersCount} members',
+                  formatMemberCount(workspace.membersCount),
                   style: TextStyle(color: colors.textHint, fontSize: 13),
                 ),
               ],
