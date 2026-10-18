@@ -41,11 +41,19 @@ class DmListTile extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? colors.onPrimary.withValues(alpha: 0.08)
+              ? colors.onPrimary.withValues(alpha: 0.12)
               : Colors.transparent,
           border: Border(
-            top: BorderSide(color: colors.onPrimary.withValues(alpha: 0.18)),
-            bottom: BorderSide(color: colors.onPrimary.withValues(alpha: 0.18)),
+            top: BorderSide(
+              color: isSelected
+                  ? Colors.transparent
+                  : colors.onPrimary.withValues(alpha: 0.18),
+            ),
+            bottom: BorderSide(
+              color: isSelected
+                  ? Colors.transparent
+                  : colors.onPrimary.withValues(alpha: 0.18),
+            ),
           ),
         ),
         child: Row(
