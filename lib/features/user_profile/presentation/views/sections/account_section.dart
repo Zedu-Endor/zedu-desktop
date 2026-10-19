@@ -33,7 +33,10 @@ class AccountSection extends StatelessWidget {
               children: [
                 Stack(
                   children: [
-                    _AvatarBlock(initials: account.initials),
+                    _AvatarBlock(
+                      initials: account.initials,
+                      avatarUrl: account.avatarUrl,
+                    ),
                     Positioned(
                       top: 8,
                       right: 8,
@@ -116,9 +119,10 @@ class AccountSection extends StatelessWidget {
 }
 
 class _AvatarBlock extends StatelessWidget {
-  const _AvatarBlock({required this.initials});
+  const _AvatarBlock({required this.initials, this.avatarUrl});
 
   final String initials;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -129,18 +133,38 @@ class _AvatarBlock extends StatelessWidget {
         color: const Color(0xFFE9FBFA),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Center(
-        child: initials.isNotEmpty
-            ? Text(
-                initials,
-                style: const TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF17C9BD),
+      clipBehavior: Clip.antiAlias,
+      child: profileAvatarImageProvider(avatarUrl) == null
+          ? Center(
+              child: initials.isNotEmpty
+                  ? Text(
+                      initials,
+                      style: const TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF17C9BD),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.person,
+                      size: 96,
+                      color: Color(0xFF17C9BD),
+                    ),
+            )
+          : Image(
+              image: profileAvatarImageProvider(avatarUrl)!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF17C9BD),
+                  ),
                 ),
-              )
-            : const Icon(Icons.person, size: 96, color: Color(0xFF17C9BD)),
-      ),
+              ),
+            ),
     );
   }
 }

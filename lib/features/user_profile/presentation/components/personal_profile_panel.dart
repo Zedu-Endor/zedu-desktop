@@ -73,15 +73,35 @@ class PersonalProfilePanel extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Avatar
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 160,
+                      height: 160,
                       color: colors.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Icon(Icons.person, size: 80, color: colors.accent),
+                      child: profileAvatarImageProvider(account.avatarUrl) ==
+                              null
+                          ? Center(
+                              child: Icon(
+                                Icons.person,
+                                size: 80,
+                                color: colors.accent,
+                              ),
+                            )
+                          : Image(
+                              image: profileAvatarImageProvider(
+                                account.avatarUrl,
+                              )!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Center(
+                                    child: Icon(
+                                      Icons.person,
+                                      size: 80,
+                                      color: colors.accent,
+                                    ),
+                                  ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 16),

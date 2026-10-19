@@ -5,6 +5,7 @@ abstract interface class UserProfileRepository {
   Future<Result<ProfileAccount>> getAccount();
   Future<Result<ProfileAccount>> updateAccount(ProfileAccount account);
   Future<Result<ProfileAccount>> uploadAvatar(String filePath);
+  Future<Result<void>> deleteAvatar();
   Future<Result<void>> deleteAccount();
 
   Future<Result<NotificationPreferences>> getNotificationPreferences();

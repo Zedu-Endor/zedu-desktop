@@ -69,6 +69,7 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
   late String selectedCountry;
 
   File? _selectedAvatar;
+  bool _removeAvatarRequested = false;
   bool _isUploading = false;
   String? _uploadError;
 
@@ -109,31 +110,43 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
         type: FileType.image,
         allowMultiple: false,
         withData: false,
+        lockParentWindow: true,
       );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        final size = await file.length();
-        const maxSize = 5 * 1024 * 1024; // 5MB
-
-        if (size > maxSize) {
-          setState(() => _uploadError = 'File size must be less than 5MB');
-          return;
-        }
-
-        setState(() {
-          _selectedAvatar = file;
-          _uploadError = null;
-        });
+      if (result == null || result.files.isEmpty) return;
+      final path = result.files.single.path;
+      if (path == null) {
+        setState(() => _uploadError = 'Could not access the selected image');
+        return;
       }
+
+      final file = File(path);
+      final size = await file.length();
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (size > maxSize) {
+        if (!mounted) return;
+        setState(() => _uploadError = 'File size must be less than 5MB');
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _selectedAvatar = file;
+        _removeAvatarRequested = false;
+        _uploadError = null;
+      });
     } catch (e) {
-      setState(() => _uploadError = 'Failed to pick image: $e');
+      if (mounted) {
+        setState(() => _uploadError = 'Failed to pick image: $e');
+      }
     }
   }
 
   Future<void> _removeAvatar() async {
     setState(() {
       _selectedAvatar = null;
+      _removeAvatarRequested = true;
       _uploadError = null;
     });
   }
@@ -141,6 +154,9 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final currentAvatar = _removeAvatarRequested
+        ? null
+        : profileAvatarImageProvider(widget.account.avatarUrl);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -462,26 +478,16 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
                                               ),
                                               fit: BoxFit.cover,
                                             )
-                                          : (widget.account.avatarUrl != null &&
-                                                    widget
-                                                        .account
-                                                        .avatarUrl!
-                                                        .isNotEmpty
-                                                ? DecorationImage(
-                                                    image: NetworkImage(
-                                                      widget.account.avatarUrl!,
-                                                    ),
+                                          : (currentAvatar == null
+                                                ? null
+                                                : DecorationImage(
+                                                    image: currentAvatar,
                                                     fit: BoxFit.cover,
-                                                  )
-                                                : null),
+                                                  )),
                                     ),
                                     child:
                                         (_selectedAvatar == null &&
-                                            (widget.account.avatarUrl == null ||
-                                                widget
-                                                    .account
-                                                    .avatarUrl!
-                                                    .isEmpty))
+                                            currentAvatar == null)
                                         ? Icon(
                                             Icons.person,
                                             size: 80,
@@ -542,9 +548,7 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
                                 ),
                               ),
                             ),
-                            if (_selectedAvatar != null ||
-                                (widget.account.avatarUrl != null &&
-                                    widget.account.avatarUrl!.isNotEmpty))
+                            if (_selectedAvatar != null || currentAvatar != null)
                               Center(
                                 child: TextButton(
                                   onPressed: _isUploading
@@ -645,22 +649,42 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
                                 }
                               }
                             } else {
-                              // No avatar change, just save form
-                              widget.onSave(
-                                widget.account.copyWith(
-                                  name: nameCtrl.text.trim(),
-                                  displayName: displayNameCtrl.text.trim(),
-                                  username: usernameCtrl.text.trim(),
-                                  email: emailCtrl.text.trim(),
-                                  phoneNumber: phoneCtrl.text.trim(),
-                                  title: titleCtrl.text.trim(),
-                                  namePronunciation: pronunciationCtrl.text
-                                      .trim(),
-                                  timezone: selectedTimezone,
-                                  country: selectedCountry,
-                                ),
+                              final updatedAccount = widget.account.copyWith(
+                                name: nameCtrl.text.trim(),
+                                displayName: displayNameCtrl.text.trim(),
+                                username: usernameCtrl.text.trim(),
+                                email: emailCtrl.text.trim(),
+                                phoneNumber: phoneCtrl.text.trim(),
+                                title: titleCtrl.text.trim(),
+                                namePronunciation: pronunciationCtrl.text
+                                    .trim(),
+                                timezone: selectedTimezone,
+                                country: selectedCountry,
+                                clearAvatarUrl: _removeAvatarRequested,
                               );
-                              if (mounted) navigator.pop();
+
+                              if (_removeAvatarRequested) {
+                                setState(() => _isUploading = true);
+                                final result = await ref
+                                    .read(userProfileRepositoryProvider)
+                                    .deleteAvatar();
+                                switch (result) {
+                                  case Success<void>():
+                                    widget.onSave(updatedAccount);
+                                    if (mounted) navigator.pop();
+                                  case Failure<void>():
+                                    if (mounted) {
+                                      setState(() {
+                                        _isUploading = false;
+                                        _uploadError = result.error.message;
+                                      });
+                                    }
+                                }
+                              } else {
+                                // Save profile details when the avatar is unchanged.
+                                widget.onSave(updatedAccount);
+                                if (mounted) navigator.pop();
+                              }
                             }
                           },
                   ),
