@@ -1,5 +1,6 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
+import 'package:flutter/services.dart'; // <-- Added for Clipboard
 
 class PersonalProfilePanel extends ConsumerWidget {
   const PersonalProfilePanel({super.key});
@@ -326,7 +327,7 @@ class _ContactRow extends StatelessWidget {
           ),
         ),
         InkWell(
-          onTap: () {},
+          onTap: () => Clipboard.setData(ClipboardData(text: label)),
           borderRadius: BorderRadius.circular(4),
           child: Icon(Icons.copy_outlined, size: 14, color: colors.textHint),
         ),
