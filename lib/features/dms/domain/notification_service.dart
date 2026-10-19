@@ -56,7 +56,9 @@ class NotificationService {
       _lastNotificationTimes[senderId] = now;
     }
 
-    String contentPreview = (message['content'] ?? '').toString();
+    String contentPreview = plainTextPreview(
+      (message['content'] ?? '').toString(),
+    );
     if (contentPreview.isEmpty) {
       final media = message['media'] as List<dynamic>? ?? [];
       if (media.isNotEmpty) {
@@ -64,10 +66,6 @@ class NotificationService {
       } else {
         contentPreview = 'New message';
       }
-    }
-
-    if (contentPreview.length > 80) {
-      contentPreview = '${contentPreview.substring(0, 77)}...';
     }
 
     final notification = LocalNotification(
