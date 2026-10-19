@@ -192,12 +192,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                       backgroundColor: colors.primary
                                           .withValues(alpha: 0.15),
                                       child: Text(
-                                        name
-                                            .substring(
-                                              0,
-                                              name.length > 1 ? 2 : 1,
-                                            )
-                                            .toUpperCase(),
+                                        avatarInitials(name, count: 2),
                                         style: TextStyle(
                                           color: colors.primary,
                                           fontSize: 10,
@@ -295,12 +290,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                               backgroundColor: colors.primary
                                                   .withValues(alpha: 0.1),
                                               child: Text(
-                                                name
-                                                    .substring(
-                                                      0,
-                                                      name.length > 1 ? 2 : 1,
-                                                    )
-                                                    .toUpperCase(),
+                                                avatarInitials(name, count: 2),
                                                 style: TextStyle(
                                                   color: colors.primary,
                                                   fontSize: 12,

@@ -127,5 +127,40 @@ void main() {
         expect(find.text('1'), findsNothing);
       },
     );
+
+    testWidgets(
+      'shows a trimmed initial and a placeholder for a blank author',
+      (tester) async {
+        Future<void> pump(String author) async {
+          await tester.pumpWidget(
+            buildTestMaterialApp(
+              Scaffold(
+                body: MessageBubble(
+                  author: author,
+                  text: 'hi',
+                  timestamp: 'now',
+                ),
+              ),
+            ),
+          );
+        }
+
+        Finder avatarLetter(String letter) {
+          return find.descendant(
+            of: find.byType(CircleAvatar),
+            matching: find.text(letter),
+          );
+        }
+
+        await pump(' John');
+        expect(avatarLetter('J'), findsOneWidget);
+
+        await pump('');
+        expect(avatarLetter('?'), findsOneWidget);
+
+        await pump('   ');
+        expect(avatarLetter('?'), findsOneWidget);
+      },
+    );
   });
 }
