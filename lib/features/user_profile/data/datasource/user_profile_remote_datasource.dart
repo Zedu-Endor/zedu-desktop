@@ -6,6 +6,7 @@ import 'package:zedu/features/features.dart';
 abstract interface class UserProfileRemoteDataSource {
   Future<ProfileAccountModel> getAccount();
   Future<ProfileAccountModel> updateAccount(ProfileAccount account);
+  Future<ProfileAccountModel> uploadAvatar(String filePath);
   Future<void> deleteAccount();
   Future<NotificationPreferencesModel> getNotificationPreferences();
   Future<NotificationPreferencesModel> updateNotificationPreferences(
@@ -80,6 +81,31 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         'timezone': account.timezone,
         'avatar_url': account.avatarUrl,
       },
+    );
+    return ProfileAccountModel.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<ProfileAccountModel> uploadAvatar(String filePath) async {
+    if (_config.usesMockData) {
+      AppLogger.d('Using mock data for POST /profile/avatar', tag: _tag);
+      // For mock, return a placeholder avatar URL
+      return ProfileAccountModel(
+        name: 'Anonymous user',
+        email: 'anonymoususer@email.com',
+        timezone: 'Africa/Lagos',
+        avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mock',
+      );
+    }
+    final fileName = filePath.split('/').last;
+    final formData = FormData.fromMap({
+      'avatar': await MultipartFile.fromFile(filePath, filename: fileName),
+    });
+    final response = await _apiBaseService.post<Map<String, dynamic>>(
+      path: '/profile/avatar',
+      data: formData,
     );
     return ProfileAccountModel.fromJson(
       response.data['data'] as Map<String, dynamic>,
