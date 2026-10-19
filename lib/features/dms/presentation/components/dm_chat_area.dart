@@ -482,8 +482,8 @@ class _MessageBubble extends ConsumerWidget {
         ? history.currentUserAvatarUrl
         : conversation.effectiveAvatarUrl;
 
-    final senderInitial = senderName.isNotEmpty
-        ? senderName[0].toUpperCase()
+    final senderInitial = senderName.trim().isNotEmpty
+        ? senderName.trim()[0].toUpperCase()
         : '?';
 
     final List<dynamic> media = (message['media'] as List<dynamic>?) ?? [];
