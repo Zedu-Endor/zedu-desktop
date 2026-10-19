@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -42,17 +44,17 @@ Future<void> showEditProfileDialog(
   );
 }
 
-class _EditProfileDialog extends StatefulWidget {
+class _EditProfileDialog extends ConsumerStatefulWidget {
   const _EditProfileDialog({required this.account, required this.onSave});
 
   final ProfileAccount account;
   final ValueChanged<ProfileAccount> onSave;
 
   @override
-  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+  ConsumerState<_EditProfileDialog> createState() => _EditProfileDialogState();
 }
 
-class _EditProfileDialogState extends State<_EditProfileDialog> {
+class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
   late final TextEditingController nameCtrl;
   late final TextEditingController displayNameCtrl;
   late final TextEditingController usernameCtrl;
@@ -65,6 +67,11 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
   late String selectedTimezone;
   late String selectedCountry;
+
+  File? _selectedAvatar;
+  bool _removeAvatarRequested = false;
+  bool _isUploading = false;
+  String? _uploadError;
 
   @override
   void initState() {
@@ -97,9 +104,59 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     super.dispose();
   }
 
+  Future<void> _pickAvatar() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: false,
+        lockParentWindow: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+      final path = result.files.single.path;
+      if (path == null) {
+        setState(() => _uploadError = 'Could not access the selected image');
+        return;
+      }
+
+      final file = File(path);
+      final size = await file.length();
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (size > maxSize) {
+        if (!mounted) return;
+        setState(() => _uploadError = 'File size must be less than 5MB');
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _selectedAvatar = file;
+        _removeAvatarRequested = false;
+        _uploadError = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploadError = 'Failed to pick image: $e');
+      }
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    setState(() {
+      _selectedAvatar = null;
+      _removeAvatarRequested = true;
+      _uploadError = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final currentAvatar = _removeAvatarRequested
+        ? null
+        : profileAvatarImageProvider(widget.account.avatarUrl);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -404,54 +461,109 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                             ),
                             const SizedBox(height: 12),
                             Center(
-                              child: Container(
-                                width: 160,
-                                height: 160,
-                                decoration: BoxDecoration(
-                                  color: colors.accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 80,
-                                  color: colors.accent,
-                                ),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    width: 160,
+                                    height: 160,
+                                    decoration: BoxDecoration(
+                                      color: colors.accent.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      image: _selectedAvatar != null
+                                          ? DecorationImage(
+                                              image: FileImage(
+                                                _selectedAvatar!,
+                                              ),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : (currentAvatar == null
+                                                ? null
+                                                : DecorationImage(
+                                                    image: currentAvatar,
+                                                    fit: BoxFit.cover,
+                                                  )),
+                                    ),
+                                    child:
+                                        (_selectedAvatar == null &&
+                                            currentAvatar == null)
+                                        ? Icon(
+                                            Icons.person,
+                                            size: 80,
+                                            color: colors.accent,
+                                          )
+                                        : null,
+                                  ),
+                                  if (_isUploading)
+                                    Container(
+                                      width: 160,
+                                      height: 160,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          color: colors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 12),
+                            if (_uploadError != null)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text(
+                                    _uploadError!,
+                                    style: context.textTheme.bodySmall
+                                        ?.copyWith(color: colors.error),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
                             Center(
                               child: TextButton.icon(
-                                onPressed: () {
-                                  // Upload photo placeholder
-                                },
+                                onPressed: _isUploading ? null : _pickAvatar,
                                 icon: Icon(
                                   Icons.upload_outlined,
                                   size: 16,
-                                  color: colors.primary,
+                                  color: _isUploading
+                                      ? colors.textHint
+                                      : colors.primary,
                                 ),
                                 label: Text(
-                                  'Upload photo',
+                                  _isUploading
+                                      ? 'Uploading...'
+                                      : 'Upload photo',
                                   style: context.textTheme.bodySmall?.copyWith(
-                                    color: colors.primary,
+                                    color: _isUploading
+                                        ? colors.textHint
+                                        : colors.primary,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ),
-                            Center(
-                              child: TextButton(
-                                onPressed: () {
-                                  // Remove photo placeholder
-                                },
-                                child: Text(
-                                  'Remove photo',
-                                  style: context.textTheme.bodySmall?.copyWith(
-                                    color: colors.error,
-                                    fontWeight: FontWeight.w500,
+                            if (_selectedAvatar != null || currentAvatar != null)
+                              Center(
+                                child: TextButton(
+                                  onPressed: _isUploading
+                                      ? null
+                                      : _removeAvatar,
+                                  child: Text(
+                                    'Remove photo',
+                                    style: context.textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: colors.error,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -480,24 +592,101 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                     label: 'Save Changes',
                     expand: false,
                     height: 40,
-                    onPressed: () {
-                      if (formKey.currentState?.validate() ?? false) {
-                        widget.onSave(
-                          widget.account.copyWith(
-                            name: nameCtrl.text.trim(),
-                            displayName: displayNameCtrl.text.trim(),
-                            username: usernameCtrl.text.trim(),
-                            email: emailCtrl.text.trim(),
-                            phoneNumber: phoneCtrl.text.trim(),
-                            title: titleCtrl.text.trim(),
-                            namePronunciation: pronunciationCtrl.text.trim(),
-                            timezone: selectedTimezone,
-                            country: selectedCountry,
-                          ),
-                        );
-                        Navigator.pop(context);
-                      }
-                    },
+                    onPressed: _isUploading
+                        ? null
+                        : () async {
+                            if (!(formKey.currentState?.validate() ?? false)) {
+                              return;
+                            }
+
+                            final navigator = Navigator.of(context);
+
+                            // If avatar selected, upload first
+                            if (_selectedAvatar != null) {
+                              setState(() => _isUploading = true);
+                              try {
+                                final repository = ref.read(
+                                  userProfileRepositoryProvider,
+                                );
+                                final result = await repository.uploadAvatar(
+                                  _selectedAvatar!.path,
+                                );
+
+                                switch (result) {
+                                  case Success<ProfileAccount>():
+                                    widget.onSave(
+                                      widget.account.copyWith(
+                                        name: nameCtrl.text.trim(),
+                                        displayName: displayNameCtrl.text
+                                            .trim(),
+                                        username: usernameCtrl.text.trim(),
+                                        email: emailCtrl.text.trim(),
+                                        phoneNumber: phoneCtrl.text.trim(),
+                                        title: titleCtrl.text.trim(),
+                                        namePronunciation: pronunciationCtrl
+                                            .text
+                                            .trim(),
+                                        timezone: selectedTimezone,
+                                        country: selectedCountry,
+                                        avatarUrl: result.value.avatarUrl,
+                                      ),
+                                    );
+                                    if (mounted) navigator.pop();
+                                  case Failure<ProfileAccount>():
+                                    if (mounted) {
+                                      setState(() {
+                                        _isUploading = false;
+                                        _uploadError = result.error.message;
+                                      });
+                                    }
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  setState(() {
+                                    _isUploading = false;
+                                    _uploadError = 'Upload failed: $e';
+                                  });
+                                }
+                              }
+                            } else {
+                              final updatedAccount = widget.account.copyWith(
+                                name: nameCtrl.text.trim(),
+                                displayName: displayNameCtrl.text.trim(),
+                                username: usernameCtrl.text.trim(),
+                                email: emailCtrl.text.trim(),
+                                phoneNumber: phoneCtrl.text.trim(),
+                                title: titleCtrl.text.trim(),
+                                namePronunciation: pronunciationCtrl.text
+                                    .trim(),
+                                timezone: selectedTimezone,
+                                country: selectedCountry,
+                                clearAvatarUrl: _removeAvatarRequested,
+                              );
+
+                              if (_removeAvatarRequested) {
+                                setState(() => _isUploading = true);
+                                final result = await ref
+                                    .read(userProfileRepositoryProvider)
+                                    .deleteAvatar();
+                                switch (result) {
+                                  case Success<void>():
+                                    widget.onSave(updatedAccount);
+                                    if (mounted) navigator.pop();
+                                  case Failure<void>():
+                                    if (mounted) {
+                                      setState(() {
+                                        _isUploading = false;
+                                        _uploadError = result.error.message;
+                                      });
+                                    }
+                                }
+                              } else {
+                                // Save profile details when the avatar is unchanged.
+                                widget.onSave(updatedAccount);
+                                if (mounted) navigator.pop();
+                              }
+                            }
+                          },
                   ),
                 ],
               ),

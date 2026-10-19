@@ -1,4 +1,14 @@
+import 'dart:io';
+
 import 'package:zedu/core/core.dart';
+
+ImageProvider<Object>? profileAvatarImageProvider(String? avatarUrl) {
+  if (avatarUrl == null || avatarUrl.isEmpty) return null;
+  if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+    return NetworkImage(avatarUrl);
+  }
+  return FileImage(File(avatarUrl));
+}
 
 class ProfileFieldLabel extends StatelessWidget {
   const ProfileFieldLabel(this.label, {super.key});

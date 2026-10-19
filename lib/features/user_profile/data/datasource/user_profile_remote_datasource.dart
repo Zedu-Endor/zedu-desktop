@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
@@ -6,6 +7,8 @@ import 'package:zedu/features/features.dart';
 abstract interface class UserProfileRemoteDataSource {
   Future<ProfileAccountModel> getAccount();
   Future<ProfileAccountModel> updateAccount(ProfileAccount account);
+  Future<ProfileAccountModel> uploadAvatar(String filePath);
+  Future<void> deleteAvatar();
   Future<void> deleteAccount();
   Future<NotificationPreferencesModel> getNotificationPreferences();
   Future<NotificationPreferencesModel> updateNotificationPreferences(
@@ -49,12 +52,18 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   final ApiBaseService _apiBaseService;
 
   static const _tag = 'UserProfileRemoteDataSource';
+  static String? _mockAvatarUrl;
 
   @override
   Future<ProfileAccountModel> getAccount() async {
-    if (_config.usesMockData) return ProfileAccountModel.fromJson(_account);
+    if (_config.usesMockData) {
+      return ProfileAccountModel.fromJson({
+        ..._account,
+        'avatar_url': _mockAvatarUrl,
+      });
+    }
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/account',
+      path: '/profile',
     );
     return ProfileAccountModel.fromJson(
       response.data['data'] as Map<String, dynamic>,
@@ -64,7 +73,8 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   @override
   Future<ProfileAccountModel> updateAccount(ProfileAccount account) async {
     if (_config.usesMockData) {
-      AppLogger.d('Using mock data for PATCH /profile/account', tag: _tag);
+      AppLogger.d('Using mock data for PATCH /profile', tag: _tag);
+      _mockAvatarUrl = account.avatarUrl;
       return ProfileAccountModel(
         name: account.name,
         email: account.email,
@@ -72,18 +82,72 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         avatarUrl: account.avatarUrl,
       );
     }
+    final formData = FormData.fromMap({
+      'full_name': account.name,
+      'display_name': account.displayName,
+      'username': account.username,
+      'email': account.email,
+      'phone': account.phoneNumber,
+      'timezone': account.timezone,
+      'title': account.title,
+      'name_pronounciation': account.namePronunciation,
+      if (account.avatarUrl != null) 'avatar_url': account.avatarUrl,
+    });
     final response = await _apiBaseService.patch<Map<String, dynamic>>(
-      path: '/profile/account',
-      data: {
-        'name': account.name,
-        'email': account.email,
-        'timezone': account.timezone,
-        'avatar_url': account.avatarUrl,
-      },
+      path: '/profile',
+      data: formData,
+      headers: {'Content-Type': 'multipart/form-data'},
+    );
+    final data = response.data['data'] as Map<String, dynamic>;
+    return ProfileAccountModel.fromJson({
+      ...data,
+      'name': data['full_name'] ?? account.name,
+      'email': data['email'] ?? account.email,
+      'timezone': data['timezone'] ?? account.timezone,
+      'avatar_url': data['avatar_url'] ?? account.avatarUrl,
+      'display_name': data['display_name'] ?? account.displayName,
+      'username': data['username'] ?? account.username,
+      'phone': data['phone'] ?? account.phoneNumber,
+      'title': data['title'] ?? account.title,
+      'name_pronounciation':
+          data['name_pronounciation'] ?? account.namePronunciation,
+    });
+  }
+
+  @override
+  Future<ProfileAccountModel> uploadAvatar(String filePath) async {
+    if (_config.usesMockData) {
+      AppLogger.d('Using mock data for PATCH /profile avatar', tag: _tag);
+      _mockAvatarUrl = filePath;
+      return ProfileAccountModel.fromJson({
+        ..._account,
+        'avatar_url': filePath,
+      });
+    }
+    final fileName = filePath.split(RegExp(r'[/\\]')).last;
+    final formData = FormData.fromMap({
+      'avatar_file': await MultipartFile.fromFile(
+        filePath,
+        filename: fileName,
+      ),
+    });
+    final response = await _apiBaseService.patch<Map<String, dynamic>>(
+      path: '/profile',
+      data: formData,
+      headers: {'Content-Type': 'multipart/form-data'},
     );
     return ProfileAccountModel.fromJson(
       response.data['data'] as Map<String, dynamic>,
     );
+  }
+
+  @override
+  Future<void> deleteAvatar() async {
+    if (_config.usesMockData) {
+      _mockAvatarUrl = null;
+      return;
+    }
+    await _apiBaseService.delete<Map<String, dynamic>>(path: '/profile/image');
   }
 
   @override
