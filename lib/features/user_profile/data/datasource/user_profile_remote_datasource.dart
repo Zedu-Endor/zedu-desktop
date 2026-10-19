@@ -72,7 +72,7 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         avatarUrl: account.avatarUrl,
       );
     }
-    final response = await _apiBaseService.patch<Map<String, dynamic>>(
+    final response = await _apiBaseService.patch<dynamic>(
       path: '/profile/account',
       data: {
         'name': account.name,
@@ -82,7 +82,12 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       },
     );
     return ProfileAccountModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+      _updatedProfileData(response.data, {
+        'name': account.name,
+        'email': account.email,
+        'timezone': account.timezone,
+        'avatar_url': account.avatarUrl,
+      }),
     );
   }
 
@@ -193,7 +198,7 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         country: organization.country,
       );
     }
-    final response = await _apiBaseService.patch<Map<String, dynamic>>(
+    final response = await _apiBaseService.patch<dynamic>(
       path: '/profile/organization',
       data: OrganizationProfileModel(
         id: organization.id,
@@ -203,8 +208,28 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       ).toJson(),
     );
     return OrganizationProfileModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+      _updatedProfileData(response.data, {
+        'id': organization.id,
+        'name': organization.name,
+        'nature_of_business': organization.natureOfBusiness,
+        'country': organization.country,
+      }),
     );
+  }
+
+  /// Some profile PATCH endpoints return only an acknowledgement (or no body)
+  /// after a successful update. Keep the submitted values as the fallback and
+  /// prefer any canonical fields the server includes in its response.
+  Map<String, dynamic> _updatedProfileData(
+    dynamic response,
+    Map<String, dynamic> submittedValues,
+  ) {
+    if (response is! Map) return submittedValues;
+
+    final payload = response['data'] is Map
+        ? response['data'] as Map
+        : response;
+    return {...submittedValues, ...Map<String, dynamic>.from(payload)};
   }
 
   @override
