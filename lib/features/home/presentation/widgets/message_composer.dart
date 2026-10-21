@@ -173,37 +173,41 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                 children: teamMembers.map((member) {
                   final name = member.name ?? member.email;
                   final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-                  return InkWell(
-                    onTap: () => _insertMention(name),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 12,
-                            backgroundColor: colors.primary.withValues(
-                              alpha: 0.1,
-                            ),
-                            child: Text(
-                              initial,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: colors.primary,
+                  return Semantics(
+                    button: true,
+                    label: 'Mention @$name',
+                    child: InkWell(
+                      onTap: () => _insertMention(name),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 12,
+                              backgroundColor: colors.primary.withValues(
+                                alpha: 0.1,
+                              ),
+                              child: Text(
+                                initial,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: colors.primary,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            name,
-                            style: TextStyle(
-                              color: colors.textPrimary,
-                              fontSize: 13,
+                            const SizedBox(width: 8),
+                            Text(
+                              name,
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 13,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );

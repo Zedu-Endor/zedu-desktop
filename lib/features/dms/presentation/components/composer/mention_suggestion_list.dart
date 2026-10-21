@@ -58,58 +58,62 @@ class MentionSuggestionList extends StatelessWidget {
                 final initial = p.username.isNotEmpty
                     ? p.username[0].toUpperCase()
                     : '?';
-                return InkWell(
-                  onTap: () => onSelect(p),
-                  hoverColor: colors.primary.withValues(alpha: 0.07),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: const Color(0xFF6458F5),
-                          backgroundImage:
-                              p.avatarUrl != null && p.avatarUrl!.isNotEmpty
-                              ? NetworkImage(p.avatarUrl!)
-                              : null,
-                          child: p.avatarUrl == null || p.avatarUrl!.isEmpty
-                              ? Text(
-                                  initial,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              p.username,
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                            if (p.email.isNotEmpty)
+                return Semantics(
+                  button: true,
+                  label: 'Mention @${p.username}',
+                  child: InkWell(
+                    onTap: () => onSelect(p),
+                    hoverColor: colors.primary.withValues(alpha: 0.07),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: const Color(0xFF6458F5),
+                            backgroundImage:
+                                p.avatarUrl != null && p.avatarUrl!.isNotEmpty
+                                ? NetworkImage(p.avatarUrl!)
+                                : null,
+                            child: p.avatarUrl == null || p.avatarUrl!.isEmpty
+                                ? Text(
+                                    initial,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               Text(
-                                p.email,
+                                p.username,
                                 style: TextStyle(
-                                  color: colors.textHint,
-                                  fontSize: 11,
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
                                 ),
                               ),
-                          ],
-                        ),
-                      ],
+                              if (p.email.isNotEmpty)
+                                Text(
+                                  p.email,
+                                  style: TextStyle(
+                                    color: colors.textHint,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
