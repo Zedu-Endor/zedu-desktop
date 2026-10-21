@@ -24,6 +24,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final showProfile = ref.watch(personalProfilePanelProvider);
+    final showSearch = ref.watch(searchPanelProvider);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -46,6 +47,17 @@ class _HomeViewState extends ConsumerState<HomeView> {
                           top: 0,
                           bottom: 0,
                           child: PersonalProfilePanel(),
+                        ),
+                      if (showSearch)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: SearchPanel(
+                            onClose: () => ref
+                                .read(searchPanelProvider.notifier)
+                                .state = false,
+                          ),
                         ),
                     ],
                   ),
@@ -87,34 +99,37 @@ class _HomeAppBar extends ConsumerWidget {
           TopUserMenu(userName: userName),
           const Spacer(),
           Flexible(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              height: 28,
-              decoration: BoxDecoration(
-                color: colors.onPrimary.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.search,
-                    color: colors.onPrimary.withValues(alpha: 0.7),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Search messages...',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.onPrimary.withValues(alpha: 0.7),
-                        fontSize: 13,
+            child: GestureDetector(
+              onTap: () => ref.read(searchPanelProvider.notifier).state = true,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                height: 28,
+                decoration: BoxDecoration(
+                  color: colors.onPrimary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.search,
+                      color: colors.onPrimary.withValues(alpha: 0.7),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Search messages...',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.onPrimary.withValues(alpha: 0.7),
+                          fontSize: 13,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
