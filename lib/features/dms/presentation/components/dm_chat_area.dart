@@ -297,37 +297,6 @@ class _DmChatHeader extends StatelessWidget {
           const Spacer(),
           Consumer(
             builder: (context, ref, child) {
-              return IconButton(
-                icon: const Icon(Icons.notifications_active_outlined),
-                tooltip: 'Test Notification (Delayed 5s)',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Notification will fire in 5 seconds. Minimize the app now!',
-                      ),
-                    ),
-                  );
-                  Future.delayed(const Duration(seconds: 5), () {
-                    ref
-                        .read(notificationServiceProvider)
-                        .handleIncomingMessage(
-                          {
-                            'user_id': conversation.participantId,
-                            'content': 'Hello! This is a test DM notification.',
-                          },
-                          conversation.channelId,
-                          conversation.displayName,
-                          forceShow: true,
-                        );
-                  });
-                },
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-          Consumer(
-            builder: (context, ref, child) {
               return InkWell(
                 onTap: () {
                   ref
