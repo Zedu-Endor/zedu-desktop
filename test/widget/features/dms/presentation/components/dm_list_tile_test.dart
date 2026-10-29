@@ -123,6 +123,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(container.read(selectedDmProvider), same(conversation));
+    expect(
+      container.read(activeChatProvider).type,
+      ActiveChatType.directMessage,
+    );
+    expect(container.read(activeChatProvider).id, conversation.participantId);
     final ink = tester.widget<Ink>(find.byType(Ink));
     expect((ink.decoration! as BoxDecoration).color, selectedFill);
     final marker = find.byWidgetPredicate(
