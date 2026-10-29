@@ -2,12 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/features/dms/domain/dm_conversation.dart';
 
 DmConversation conversationWith(String username) => DmConversation(
-      channelId: 'channel-1',
-      username: username,
-      participantId: 'participant-1',
-      previewMessage: 'Hey there',
-      unreadCount: 0,
-    );
+  channelId: 'channel-1',
+  username: username,
+  participantId: 'participant-1',
+  previewMessage: 'Hey there',
+  unreadCount: 0,
+);
 
 void main() {
   group('DmConversation.dmHandle', () {
