@@ -32,7 +32,14 @@ class DmListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final selected = ref.watch(selectedDmProvider);
-    final isSelected = selected?.channelId == conversation.channelId;
+    final activeChat = ref.watch(activeChatProvider);
+    final isSelected =
+        (selected != null &&
+            (selected.channelId == conversation.channelId ||
+                (selected.channelId.isEmpty &&
+                    selected.participantId == conversation.participantId))) ||
+        (activeChat.type == ActiveChatType.directMessage &&
+            activeChat.id == conversation.participantId);
     final hasUnread = conversation.unreadCount > 0;
     final borderRadius = BorderRadius.circular(6);
 
@@ -64,6 +71,9 @@ class DmListTile extends ConsumerWidget {
           mouseCursor: SystemMouseCursors.click,
           onTap: () {
             ref.read(selectedDmProvider.notifier).select(conversation);
+            ref
+                .read(activeChatProvider.notifier)
+                .selectDirectMessage(conversation.participantId);
           },
           child: Stack(
             children: [
