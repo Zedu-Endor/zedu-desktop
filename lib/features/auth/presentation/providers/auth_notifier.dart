@@ -38,9 +38,28 @@ class AuthNotifier extends Notifier<AuthState> {
         AppLogger.i('Session restored — ${result.value.email}', tag: _tag);
         state = AuthState(status: AuthStatus.authenticated, user: result.value);
       case Failure<User>():
-        AppLogger.w('Session restore failed — clearing token', tag: _tag);
-        await _storage.deleteAccessToken();
-        state = const AuthState(status: AuthStatus.unauthenticated);
+        final failure = result.error;
+        if (failure.kind == ApiFailureKind.unauthorized) {
+          // The server rejected the token, so it is really invalid.
+          AppLogger.w(
+            'Session restore rejected (401) — clearing token',
+            tag: _tag,
+          );
+          await _storage.deleteAccessToken();
+          state = const AuthState(status: AuthStatus.unauthenticated);
+        } else {
+          // Network, timeout or server problem: the token may still be valid.
+          // Keep it so the next launch can restore the session, and tell the
+          // user why they are on the login screen.
+          AppLogger.w(
+            'Session restore failed (${failure.kind.name}) — keeping token',
+            tag: _tag,
+          );
+          state = AuthState(
+            status: AuthStatus.unauthenticated,
+            error: failure.friendlyMessage,
+          );
+        }
     }
   }
 

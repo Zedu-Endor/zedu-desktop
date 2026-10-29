@@ -60,14 +60,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
     final authState = ref.watch(authNotifierProvider);
 
     // Format the email to mask it like pl***@gmail.com
-    String maskedEmail = widget.email;
-    if (maskedEmail.contains('@')) {
-      final parts = maskedEmail.split('@');
-      final local = parts[0];
-      if (local.length > 2) {
-        maskedEmail = '${local.substring(0, 2)}***@${parts[1]}';
-      }
-    }
+    final maskedEmail = maskEmail(widget.email);
 
     return Scaffold(
       backgroundColor: context.colors.background,

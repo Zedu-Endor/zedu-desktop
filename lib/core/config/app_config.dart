@@ -1,13 +1,22 @@
 import 'package:zedu/core/core.dart';
 
+/// Default Google OAuth client id for the **desktop** client type; it applies
+/// whenever `GOOGLE_CLIENT_ID` comes from neither `--dart-define` nor `.env`.
+///
+/// This is the id the app actually runs with: the locator registers
+/// [AppConfig.fromEnvironment], whose fallback reads this constant, and the
+/// [AppConfig] constructor default reads it too, so direct construction and
+/// environment resolution can never disagree. For reference, the **web**
+/// client id used by browser builds is
+/// `764182056638-bi8bet0rdoabaeq24bqsdnb5iukn7ko4.apps.googleusercontent.com`.
+const String kDefaultDesktopGoogleClientId =
+    '764182056638-08g88e196e643mhpa2tuv5dpr7iumd1j.apps.googleusercontent.com';
+
 class AppConfig {
   const AppConfig({
     required this.apiBaseUrl,
     required this.usesMockData,
-    // Web Client ID: '764182056638-bi8bet0rdoabaeq24bqsdnb5iukn7ko4.apps.googleusercontent.com'
-    // Desktop Client ID:
-    this.googleClientId =
-        '764182056638-qtmk2mattvq035th78hjgpe5docu0oh1.apps.googleusercontent.com',
+    this.googleClientId = kDefaultDesktopGoogleClientId,
     this.googleClientSecret = '',
   });
 
@@ -50,9 +59,7 @@ class AppConfig {
         ? defineClientId
         : (envClientId?.isNotEmpty ?? false)
         ? envClientId!
-        // Web Client ID: '764182056638-bi8bet0rdoabaeq24bqsdnb5iukn7ko4.apps.googleusercontent.com'
-        // Desktop Client ID:
-        : '764182056638-08g88e196e643mhpa2tuv5dpr7iumd1j.apps.googleusercontent.com';
+        : kDefaultDesktopGoogleClientId;
 
     final googleClientSecret = defineClientSecret.isNotEmpty
         ? defineClientSecret
