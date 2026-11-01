@@ -54,76 +54,80 @@ Future<void> showEditAccountDialog(
 
   await showDialog<void>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(
-        'Edit Account',
-        style: ctx.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-      ),
-      content: SizedBox(
-        width: 480,
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppTextField(
-                label: 'Name',
-                controller: nameCtrl,
-                hint: 'Enter your full name',
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-              ),
-              const SizedBox(height: 16),
-              AppTextField(
-                label: 'Email Address',
-                controller: emailCtrl,
-                hint: 'Enter your email',
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Email is required';
-                  return Validators.validateEmail(context, v.trim());
-                },
-              ),
-              const SizedBox(height: 16),
-              AppTextField(
-                label: 'Timezone',
-                controller: timezoneCtrl,
-                hint: 'e.g. Africa/Lagos',
-              ),
-            ],
+    builder: (ctx) => _KeepsControllers(
+      controllers: [nameCtrl, emailCtrl, timezoneCtrl],
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Edit Account',
+          style: ctx.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
-        AppButton(
-          label: 'Save changes',
-          expand: false,
-          height: 40,
-          onPressed: () {
-            if (formKey.currentState?.validate() ?? false) {
-              onSave(
-                account.copyWith(
-                  name: nameCtrl.text.trim(),
-                  email: emailCtrl.text.trim(),
-                  timezone: timezoneCtrl.text.trim(),
+        content: SizedBox(
+          width: 480,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppTextField(
+                  label: 'Name',
+                  controller: nameCtrl,
+                  hint: 'Enter your full name',
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Name is required'
+                      : null,
                 ),
-              );
-              Navigator.pop(ctx);
-            }
-          },
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: 'Email Address',
+                  controller: emailCtrl,
+                  hint: 'Enter your email',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Email is required';
+                    }
+                    return Validators.validateEmail(context, v.trim());
+                  },
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: 'Timezone',
+                  controller: timezoneCtrl,
+                  hint: 'e.g. Africa/Lagos',
+                ),
+              ],
+            ),
+          ),
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          AppButton(
+            label: 'Save changes',
+            expand: false,
+            height: 40,
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                onSave(
+                  account.copyWith(
+                    name: nameCtrl.text.trim(),
+                    email: emailCtrl.text.trim(),
+                    timezone: timezoneCtrl.text.trim(),
+                  ),
+                );
+                Navigator.pop(ctx);
+              }
+            },
+          ),
+        ],
+      ),
     ),
   );
-
-  nameCtrl.dispose();
-  emailCtrl.dispose();
-  timezoneCtrl.dispose();
 }
 
 /// Dialog for changing password.
@@ -143,153 +147,154 @@ Future<void> showChangePasswordDialog(
 
   await showDialog<void>(
     context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setDialogState) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Change password',
-          style: ctx.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+    builder: (ctx) => _KeepsControllers(
+      controllers: [currentCtrl, newCtrl, confirmCtrl],
+      child: StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ),
-        content: SizedBox(
-          width: 480,
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AppTextField(
-                    label: 'Current Password',
-                    controller: currentCtrl,
-                    hint: 'Enter current password',
-                    isPassword: true,
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  AppTextField(
-                    label: 'New Password',
-                    controller: newCtrl,
-                    hint: 'Enter new password',
-                    isPassword: true,
-                    onChanged: (_) {
-                      setDialogState(() {});
-                      if (hasAttemptedSubmit) {
-                        formKey.currentState?.validate();
-                      }
-                    },
-                    validator: (v) => Validators.validatePassword(ctx, v),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Password requirements',
-                    style: ctx.textTheme.bodySmall?.copyWith(
-                      color: ctx.colors.textSecondary,
-                      fontWeight: FontWeight.w600,
+          title: Text(
+            'Change password',
+            style: ctx.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AppTextField(
+                      label: 'Current Password',
+                      controller: currentCtrl,
+                      hint: 'Enter current password',
+                      isPassword: true,
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Required' : null,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...Validators.passwordRequirements(newCtrl.text).map(
-                    (requirement) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            requirement.isMet
-                                ? Icons.check_circle
-                                : Icons.circle_outlined,
-                            size: 16,
-                            color: requirement.isMet
-                                ? ctx.colors.primary
-                                : ctx.colors.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              requirement.label,
-                              style: ctx.textTheme.bodySmall?.copyWith(
-                                color: ctx.colors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 16),
+                    AppTextField(
+                      label: 'New Password',
+                      controller: newCtrl,
+                      hint: 'Enter new password',
+                      isPassword: true,
+                      onChanged: (_) {
+                        setDialogState(() {});
+                        if (hasAttemptedSubmit) {
+                          formKey.currentState?.validate();
+                        }
+                      },
+                      validator: (v) => Validators.validatePassword(ctx, v),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Password requirements',
+                      style: ctx.textTheme.bodySmall?.copyWith(
+                        color: ctx.colors.textSecondary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  AppTextField(
-                    label: 'Confirm New Password',
-                    controller: confirmCtrl,
-                    hint: 'Re-enter new password',
-                    isPassword: true,
-                    onChanged: (_) {
-                      setDialogState(() {});
-                      if (hasAttemptedSubmit) {
-                        formKey.currentState?.validate();
-                      }
-                    },
-                    validator: (v) {
-                      if (v == null || v.isEmpty) {
-                        return 'Please confirm your new password';
-                      }
-                      if (v != newCtrl.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
-                  ),
-                  if (!hasAttemptedSubmit &&
-                      confirmCtrl.text.isNotEmpty &&
-                      confirmCtrl.text != newCtrl.text)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Passwords do not match',
-                        style: ctx.textTheme.bodySmall?.copyWith(
-                          color: ctx.colors.textSecondary,
+                    const SizedBox(height: 8),
+                    ...Validators.passwordRequirements(newCtrl.text).map(
+                      (requirement) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              requirement.isMet
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              size: 16,
+                              color: requirement.isMet
+                                  ? ctx.colors.primary
+                                  : ctx.colors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                requirement.label,
+                                style: ctx.textTheme.bodySmall?.copyWith(
+                                  color: ctx.colors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                ],
+                    const SizedBox(height: 10),
+                    AppTextField(
+                      label: 'Confirm New Password',
+                      controller: confirmCtrl,
+                      hint: 'Re-enter new password',
+                      isPassword: true,
+                      onChanged: (_) {
+                        setDialogState(() {});
+                        if (hasAttemptedSubmit) {
+                          formKey.currentState?.validate();
+                        }
+                      },
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return 'Please confirm your new password';
+                        }
+                        if (v != newCtrl.text) {
+                          return 'Passwords do not match';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (!hasAttemptedSubmit &&
+                        confirmCtrl.text.isNotEmpty &&
+                        confirmCtrl.text != newCtrl.text)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Passwords do not match',
+                          style: ctx.textTheme.bodySmall?.copyWith(
+                            color: ctx.colors.textSecondary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          AppButton(
-            label: 'Update Password',
-            expand: false,
-            height: 40,
-            onPressed: () async {
-              setDialogState(() {
-                hasAttemptedSubmit = true;
-              });
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            AppButton(
+              label: 'Update Password',
+              expand: false,
+              height: 40,
+              onPressed: () async {
+                setDialogState(() {
+                  hasAttemptedSubmit = true;
+                });
 
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(ctx);
-                await onSave(
-                  currentPassword: currentCtrl.text,
-                  newPassword: newCtrl.text,
-                );
-              }
-            },
-          ),
-        ],
+                if (formKey.currentState?.validate() ?? false) {
+                  Navigator.pop(ctx);
+                  await onSave(
+                    currentPassword: currentCtrl.text,
+                    newPassword: newCtrl.text,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
       ),
     ),
   );
-
-  currentCtrl.dispose();
-  newCtrl.dispose();
-  confirmCtrl.dispose();
 }
 
 /// Dialog for editing organization information.
@@ -307,71 +312,73 @@ Future<void> showEditOrganizationDialog(
 
   await showDialog<void>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(
-        'Edit Organization',
-        style: ctx.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-      ),
-      content: SizedBox(
-        width: 480,
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppTextField(
-                label: 'Organization Name',
-                controller: nameCtrl,
-                hint: 'Enter organization name',
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-              ),
-              const SizedBox(height: 16),
-              AppTextField(
-                label: 'Nature of Business',
-                controller: businessCtrl,
-                hint: 'e.g. Design agency',
-              ),
-              const SizedBox(height: 16),
-              AppTextField(
-                label: 'Country',
-                controller: countryCtrl,
-                hint: 'e.g. Nigeria',
-              ),
-            ],
+    builder: (ctx) => _KeepsControllers(
+      controllers: [nameCtrl, businessCtrl, countryCtrl],
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Edit Organization',
+          style: ctx.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
-        AppButton(
-          label: 'Save changes',
-          expand: false,
-          height: 40,
-          onPressed: () {
-            if (formKey.currentState?.validate() ?? false) {
-              onSave(
-                organization.copyWith(
-                  name: nameCtrl.text.trim(),
-                  natureOfBusiness: businessCtrl.text.trim(),
-                  country: countryCtrl.text.trim(),
+        content: SizedBox(
+          width: 480,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppTextField(
+                  label: 'Organization Name',
+                  controller: nameCtrl,
+                  hint: 'Enter organization name',
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Name is required'
+                      : null,
                 ),
-              );
-              Navigator.pop(ctx);
-            }
-          },
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: 'Nature of Business',
+                  controller: businessCtrl,
+                  hint: 'e.g. Design agency',
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: 'Country',
+                  controller: countryCtrl,
+                  hint: 'e.g. Nigeria',
+                ),
+              ],
+            ),
+          ),
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          AppButton(
+            label: 'Save changes',
+            expand: false,
+            height: 40,
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                onSave(
+                  organization.copyWith(
+                    name: nameCtrl.text.trim(),
+                    natureOfBusiness: businessCtrl.text.trim(),
+                    country: countryCtrl.text.trim(),
+                  ),
+                );
+                Navigator.pop(ctx);
+              }
+            },
+          ),
+        ],
+      ),
     ),
   );
-
-  nameCtrl.dispose();
-  businessCtrl.dispose();
-  countryCtrl.dispose();
 }
 
 /// Dialog for inviting a team member.
@@ -385,85 +392,91 @@ Future<void> showInviteMemberDialog(
 
   await showDialog<void>(
     context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setDialogState) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Invite Team Member',
-          style: ctx.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+    builder: (ctx) => _KeepsControllers(
+      controllers: [emailCtrl],
+      child: StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ),
-        content: SizedBox(
-          width: 480,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppTextField(
-                  label: 'Email Address',
-                  controller: emailCtrl,
-                  hint: 'Enter email address',
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Email is required';
-                    }
-                    return Validators.validateEmail(context, v.trim());
-                  },
-                ),
-                const SizedBox(height: 16),
-                ProfileFieldLabel('Role'),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  initialValue: role,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Administrator',
-                      child: Text('Administrator'),
-                    ),
-                    DropdownMenuItem(value: 'Manager', child: Text('Manager')),
-                    DropdownMenuItem(value: 'User', child: Text('User')),
-                  ],
-                  onChanged: (v) => setDialogState(() => role = v ?? 'User'),
-                ),
-              ],
+          title: Text(
+            'Invite Team Member',
+            style: ctx.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
           ),
+          content: SizedBox(
+            width: 480,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppTextField(
+                    label: 'Email Address',
+                    controller: emailCtrl,
+                    hint: 'Enter email address',
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Email is required';
+                      }
+                      return Validators.validateEmail(context, v.trim());
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ProfileFieldLabel('Role'),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Administrator',
+                        child: Text('Administrator'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Manager',
+                        child: Text('Manager'),
+                      ),
+                      DropdownMenuItem(value: 'User', child: Text('User')),
+                    ],
+                    onChanged: (v) => setDialogState(() => role = v ?? 'User'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            AppButton(
+              label: 'Send Invite',
+              expand: false,
+              height: 40,
+              onPressed: () async {
+                if (formKey.currentState?.validate() ?? false) {
+                  Navigator.pop(ctx);
+                  await onInvite(email: emailCtrl.text.trim(), role: role);
+                }
+              },
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          AppButton(
-            label: 'Send Invite',
-            expand: false,
-            height: 40,
-            onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(ctx);
-                await onInvite(email: emailCtrl.text.trim(), role: role);
-              }
-            },
-          ),
-        ],
       ),
     ),
   );
-
-  emailCtrl.dispose();
 }
 
 /// Dialog for editing a team member's role.
@@ -542,4 +555,33 @@ Future<void> showEditMemberDialog(
       ),
     ),
   );
+}
+
+/// Owns the dialog's [TextEditingController]s so they are disposed when the
+/// route's subtree unmounts, which is after its exit transition has finished.
+///
+/// Disposing straight after `showDialog` returns is too early: that future
+/// completes when the route is popped, while the dialog is still animating
+/// out and its fields still rebuild against the controllers.
+class _KeepsControllers extends StatefulWidget {
+  const _KeepsControllers({required this.controllers, required this.child});
+
+  final List<TextEditingController> controllers;
+  final Widget child;
+
+  @override
+  State<_KeepsControllers> createState() => _KeepsControllersState();
+}
+
+class _KeepsControllersState extends State<_KeepsControllers> {
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

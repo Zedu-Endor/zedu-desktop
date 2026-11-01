@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
@@ -77,5 +78,21 @@ void main() {
 
     expect(find.text('Select a country from the list'), findsNothing);
     expect(saved?.country, 'Nigeria');
+  });
+
+  testWidgets('rejects a malformed email such as a bare @', (tester) async {
+    ProfileAccount? saved;
+    await openDialog(tester, (account) => saved = account);
+
+    final emailField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Email'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(emailField, '@');
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please enter a valid email'), findsOneWidget);
+    expect(saved, isNull);
   });
 }
