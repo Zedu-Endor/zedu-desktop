@@ -267,9 +267,9 @@ class AuthNotifier extends Notifier<AuthState> {
     HttpServer? server;
     // Read before the first await so a disposed notifier cannot read a ref.
     final redirectTimeout = ref.read(googleRedirectTimeoutProvider);
+    final port = ref.read(googleRedirectPortProvider);
     try {
       final config = locator<AppConfig>();
-      const port = 8000; // Standard redirect port for desktop
 
       // 1. Bind to localhost port to intercept the redirect
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);

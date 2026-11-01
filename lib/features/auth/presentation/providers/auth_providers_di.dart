@@ -19,6 +19,11 @@ final googleRedirectTimeoutProvider = Provider<Duration>(
   (ref) => const Duration(minutes: 2),
 );
 
+/// The loopback port Google redirects back to after consent. 8000 is the
+/// port registered with Google for the desktop client; tests override it with
+/// a free port so a busy 8000 cannot fail an unrelated run.
+final googleRedirectPortProvider = Provider<int>((ref) => 8000);
+
 /// Opens a URL in the user's browser. Injected so the Google sign-in flow can
 /// be driven in tests without launching a real browser.
 final externalUrlLauncherProvider = Provider<Future<bool> Function(Uri)>(

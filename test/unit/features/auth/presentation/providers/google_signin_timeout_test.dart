@@ -15,8 +15,16 @@ void main() {
     late MockSecureStorageService storage;
     late ProviderContainer container;
     Uri? launched;
+    late int port;
 
-    setUp(() {
+    setUp(() async {
+      // Claim a free port and release it, so the flow under test binds a port
+      // nothing else holds. Hard-coding 8000 fails whenever something else
+      // has it, which has nothing to do with the behaviour being tested.
+      final probe = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      port = probe.port;
+      await probe.close();
+
       repository = MockAuthRepository();
       storage = MockSecureStorageService();
       launched = null;
@@ -43,6 +51,7 @@ void main() {
           googleRedirectTimeoutProvider.overrideWithValue(
             const Duration(milliseconds: 50),
           ),
+          googleRedirectPortProvider.overrideWithValue(port),
           externalUrlLauncherProvider.overrideWithValue((uri) async {
             launched = uri;
             return true;
@@ -95,8 +104,11 @@ void main() {
 
         // Binding would throw if the loopback server were still listening,
         // which is what made the retry impossible before the fix.
-        final probe = await HttpServer.bind(InternetAddress.loopbackIPv4, 8000);
-        addTearDown(probe.close);
+        final rebind = await HttpServer.bind(
+          InternetAddress.loopbackIPv4,
+          port,
+        );
+        addTearDown(rebind.close);
       },
     );
   });
