@@ -197,10 +197,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                 if (v == null || v.trim().isEmpty) {
                                   return 'Email is required';
                                 }
-                                if (!v.contains('@')) {
-                                  return 'Enter a valid email';
-                                }
-                                return null;
+                                return Validators.validateEmail(
+                                  context,
+                                  v.trim(),
+                                );
                               },
                             ),
                             const SizedBox(height: 16),
@@ -497,7 +497,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                   ),
                   const SizedBox(width: 12),
                   AppButton(
-                    label: 'Save Changes',
+                    label: 'Save changes',
                     expand: false,
                     height: 40,
                     onPressed: () {

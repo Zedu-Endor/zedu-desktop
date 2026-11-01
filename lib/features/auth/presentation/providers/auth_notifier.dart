@@ -63,15 +63,28 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  Future<void> login({required String email, required String password}) async {
+  /// With [rememberMe] false the session lasts until the app closes.
+  Future<void> login({
+    required String email,
+    required String password,
+    bool rememberMe = true,
+  }) async {
     AppLogger.d('Login attempt — $email', tag: _tag);
     state = state.copyWith(isLoading: true, clearError: true);
 
     final result = await _repository.login(email: email, password: password);
     switch (result) {
       case Success<AuthSession>():
-        AppLogger.i('Login succeeded — token persisted', tag: _tag);
-        await _storage.saveAccessToken(result.value.accessToken);
+        AppLogger.i(
+          rememberMe
+              ? 'Login succeeded — token persisted'
+              : 'Login succeeded — token kept for this run only',
+          tag: _tag,
+        );
+        await _storage.saveAccessToken(
+          result.value.accessToken,
+          persist: rememberMe,
+        );
         state = AuthState(
           status: AuthStatus.authenticated,
           user: result.value.user,

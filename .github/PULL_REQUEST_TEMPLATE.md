@@ -2,12 +2,6 @@
 
 <!-- Link to the approved ClickUp/Linear ticket. -->
 
-## Team lead
-
-<!-- @handle of your team lead. A lead registered for your fork's org must approve before the Lead approved check passes and Zedu reviewers pick it up. -->
-
-@
-
 ## What changed
 
 <!-- Short summary of the change. -->
@@ -53,5 +47,4 @@
 - [ ] No secrets or debug code committed
 - [ ] Tests added/updated for what this ticket changed (not retroactive coverage of unrelated code)
 - [ ] Fork build triggered (first run: fork → Actions → PR build → Run workflow)
-- [ ] Team lead approved this PR
 - [ ] Self-reviewed (`git status` / `git diff`)
