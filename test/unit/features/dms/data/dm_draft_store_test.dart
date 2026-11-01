@@ -1,0 +1,35 @@
+import 'dart:async';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:zedu/core/core.dart';
+import 'package:zedu/features/features.dart';
+
+class _DelayedReadStorage extends Fake implements SecureStorageService {
+  final Completer<String?> readCompleter = Completer<String?>();
+
+  @override
+  Future<String?> readData(String key) => readCompleter.future;
+
+  @override
+  Future<void> writeData(String key, String value) async {}
+}
+
+void main() {
+  test(
+    'a late initial read does not replace a draft saved while it waits',
+    () async {
+      final storage = _DelayedReadStorage();
+      final store = DmDraftStore(storage, userId: 'user-1', orgId: 'org-1');
+
+      final pendingLoad = store.load('channel-1');
+      await store.save('channel-1', 'new draft', updatedAt: 42);
+      storage.readCompleter.complete(null);
+
+      await pendingLoad;
+
+      expect(store.peek('channel-1')?.text, 'new draft');
+      expect(store.peek('channel-1')?.updatedAt, 42);
+      store.dispose();
+    },
+  );
+}
