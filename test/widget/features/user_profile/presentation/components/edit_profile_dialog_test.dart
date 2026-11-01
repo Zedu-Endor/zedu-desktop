@@ -40,7 +40,7 @@ void main() {
     await openDialog(tester, (account) => saved = account);
 
     await tester.enterText(find.byType(TextFormField).last, 'ugggge');
-    await tester.tap(find.text('Save Changes'));
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
     expect(find.text('Select a country from the list'), findsOneWidget);
@@ -59,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nigeria').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save Changes'));
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
     expect(saved?.country, 'Nigeria');
@@ -72,7 +72,7 @@ void main() {
     await openDialog(tester, (account) => saved = account);
 
     await tester.enterText(find.byType(TextFormField).last, 'nigeria');
-    await tester.tap(find.text('Save Changes'));
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
     expect(find.text('Select a country from the list'), findsNothing);

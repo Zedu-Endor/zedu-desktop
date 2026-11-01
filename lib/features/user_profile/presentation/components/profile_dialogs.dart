@@ -82,8 +82,7 @@ Future<void> showEditAccountDialog(
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Email is required';
-                  if (!v.contains('@')) return 'Enter a valid email';
-                  return null;
+                  return Validators.validateEmail(context, v.trim());
                 },
               ),
               const SizedBox(height: 16),
@@ -148,7 +147,7 @@ Future<void> showChangePasswordDialog(
       builder: (ctx, setDialogState) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
-          'Change Password',
+          'Change password',
           style: ctx.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
           ),
@@ -412,8 +411,7 @@ Future<void> showInviteMemberDialog(
                     if (v == null || v.trim().isEmpty) {
                       return 'Email is required';
                     }
-                    if (!v.contains('@')) return 'Enter a valid email';
-                    return null;
+                    return Validators.validateEmail(context, v.trim());
                   },
                 ),
                 const SizedBox(height: 16),
