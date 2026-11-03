@@ -161,8 +161,9 @@ void main() {
   group('DmChatArea message text', () {
     Future<void> pumpChat(
       WidgetTester tester,
-      List<Map<String, dynamic>> messages,
-    ) async {
+      List<Map<String, dynamic>> messages, {
+      DmConversation? conversation,
+    }) async {
       tester.view.physicalSize = const Size(1200, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -187,13 +188,15 @@ void main() {
           child: buildTestMaterialApp(
             Scaffold(
               body: DmChatArea(
-                conversation: DmConversation(
-                  channelId: 'ch-1',
-                  username: 'Ada Lovelace',
-                  participantId: 'u-2',
-                  previewMessage: '',
-                  unreadCount: 0,
-                ),
+                conversation:
+                    conversation ??
+                    DmConversation(
+                      channelId: 'ch-1',
+                      username: 'Ada Lovelace',
+                      participantId: 'u-2',
+                      previewMessage: '',
+                      unreadCount: 0,
+                    ),
               ),
             ),
           ),
@@ -441,5 +444,30 @@ void main() {
       expect(find.text('hello\n---', findRichText: true), findsOneWidget);
       expect(find.byType(IntrinsicWidth), findsNothing);
     });
+
+    testWidgets(
+      'renders full emoji grapheme cluster as avatar initial in header without splitting surrogates',
+      (tester) async {
+        await pumpChat(
+          tester,
+          List.generate(50, (i) => message('m$i', 'message $i')),
+          conversation: DmConversation(
+            channelId: 'ch-emoji',
+            username: '🚀 Rocket Launchers',
+            participantId: 'u-emoji',
+            previewMessage: '',
+            unreadCount: 0,
+          ),
+        );
+
+        expect(
+          find.descendant(
+            of: find.byType(CircleAvatar).first,
+            matching: find.text('🚀'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }
