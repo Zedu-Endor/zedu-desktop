@@ -108,9 +108,7 @@ void main() {
       'rebuilding notifier does not create duplicate subscriptions',
       () async {
         // Create a group DM
-        await container
-            .read(groupDmProvider.notifier)
-            .createGroupDm([member1]);
+        await container.read(groupDmProvider.notifier).createGroupDm([member1]);
 
         // Invalidate and re-read to trigger rebuild
         container.invalidate(groupDmProvider);
