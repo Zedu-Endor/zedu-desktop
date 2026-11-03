@@ -234,5 +234,20 @@ void main() {
 
       expect(find.text('2/4/2026'), findsOneWidget);
     });
+
+    testWidgets(
+      'renders fallback avatar initial for emoji and whitespace names without RangeError',
+      (tester) async {
+        await tester.pumpWidget(
+          buildTileUnderTest(buildConversation(username: '🚀 Rocket')),
+        );
+        expect(find.text('🚀'), findsOneWidget);
+
+        await tester.pumpWidget(
+          buildTileUnderTest(buildConversation(username: '   ')),
+        );
+        expect(find.text('?'), findsOneWidget);
+      },
+    );
   });
 }

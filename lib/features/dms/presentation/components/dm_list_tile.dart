@@ -99,6 +99,10 @@ class DmListTile extends ConsumerWidget {
     DraftEntry? draftEntry,
   ) {
     final emphasis = hasUnread ? FontWeight.w700 : FontWeight.w400;
+    final trimmed = conversation.displayName.trim();
+    final initial = trimmed.isNotEmpty
+        ? trimmed.characters.first.toUpperCase()
+        : '?';
 
     return Row(
       children: [
@@ -110,7 +114,7 @@ class DmListTile extends ConsumerWidget {
               : null,
           child: conversation.effectiveAvatarUrl == null
               ? Text(
-                  conversation.displayName[0].toUpperCase(),
+                  initial,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
