@@ -37,6 +37,7 @@ class AuthNotifier extends Notifier<AuthState> {
     switch (result) {
       case Success<User>():
         AppLogger.i('Session restored — ${result.value.email}', tag: _tag);
+        _storage.allowWritesWithPrefix('dm_draft_${result.value.id}_');
         state = AuthState(status: AuthStatus.authenticated, user: result.value);
       case Failure<User>():
         final failure = result.error;
@@ -86,6 +87,7 @@ class AuthNotifier extends Notifier<AuthState> {
           result.value.accessToken,
           persist: rememberMe,
         );
+        _storage.allowWritesWithPrefix('dm_draft_${result.value.user.id}_');
         state = AuthState(
           status: AuthStatus.authenticated,
           user: result.value.user,
@@ -111,6 +113,7 @@ class AuthNotifier extends Notifier<AuthState> {
           tag: _tag,
         );
         await _storage.saveAccessToken(result.value.accessToken);
+        _storage.allowWritesWithPrefix('dm_draft_${result.value.user.id}_');
         state = AuthState(
           status: AuthStatus.authenticated,
           user: result.value.user,
@@ -129,6 +132,9 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> logout() async {
     AppLogger.i('Logout — clearing session', tag: _tag);
+    if (state.user != null) {
+      await _storage.deleteValuesWithPrefix('dm_draft_${state.user!.id}_');
+    }
     await _storage.deleteAccessToken();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
@@ -344,6 +350,7 @@ class AuthNotifier extends Notifier<AuthState> {
         case Success<AuthSession>():
           AppLogger.i('Google Sign-In succeeded — token persisted', tag: _tag);
           await _storage.saveAccessToken(result.value.accessToken);
+          _storage.allowWritesWithPrefix('dm_draft_${result.value.user.id}_');
           state = AuthState(
             status: AuthStatus.authenticated,
             user: result.value.user,

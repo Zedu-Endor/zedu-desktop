@@ -91,5 +91,57 @@ void main() {
       expect(state.status, AuthStatus.unauthenticated);
       expect(state.error, isNull);
     });
+
+    test('clears the signed-in user drafts when logging out', () async {
+      final user = User(
+        id: 'user-1',
+        firstName: 'Test',
+        lastName: 'User',
+        email: 'test@example.com',
+        phone: '',
+        username: 'test-user',
+        isVerified: true,
+        isOnboarded: true,
+        createdAt: DateTime(2026),
+        currentOrg: 'org-1',
+        currentOrganisationSlug: 'org-1',
+        avatarUrl: '',
+        defaultAvatarUrl: '',
+      );
+      when(() => storage.getAccessToken()).thenAnswer((_) async => null);
+      when(
+        () => repository.login(email: 'test@example.com', password: 'password'),
+      ).thenAnswer(
+        (_) async => Success<AuthSession>(
+          AuthSession(
+            user: user,
+            accessToken: 'token-1',
+            accessTokenExpiresIn: DateTime(2027),
+          ),
+        ),
+      );
+      when(
+        () => storage.saveAccessToken('token-1', persist: true),
+      ).thenAnswer((_) async {});
+      when(
+        () => storage.deleteValuesWithPrefix('dm_draft_user-1_'),
+      ).thenAnswer((_) async {});
+
+      await restoreSession();
+      final notifier = container.read(authNotifierProvider.notifier);
+      await notifier.login(email: 'test@example.com', password: 'password');
+
+      await notifier.logout();
+
+      verify(
+        () => storage.deleteValuesWithPrefix('dm_draft_user-1_'),
+      ).called(1);
+      verify(() => storage.allowWritesWithPrefix('dm_draft_user-1_')).called(1);
+      verify(() => storage.deleteAccessToken()).called(1);
+      expect(
+        container.read(authNotifierProvider).status,
+        AuthStatus.unauthenticated,
+      );
+    });
   });
 }
