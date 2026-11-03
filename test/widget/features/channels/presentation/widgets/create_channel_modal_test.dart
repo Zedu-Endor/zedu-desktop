@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -7,6 +9,10 @@ class _FakeChannelNotifier extends ChannelNotifier {
   Result<Channel> result = const Failure<Channel>(
     ApiFailure(message: 'Channel name already exists'),
   );
+  int createCalls = 0;
+
+  /// When set, creating waits for it, so a test can act while a create runs.
+  Completer<void>? pending;
 
   @override
   Future<List<Channel>> build() async => const [];
@@ -17,7 +23,11 @@ class _FakeChannelNotifier extends ChannelNotifier {
     required String description,
     required bool isPrivate,
     String? topic,
-  }) async => result;
+  }) async {
+    createCalls++;
+    await pending?.future;
+    return result;
+  }
 }
 
 void main() {
@@ -117,6 +127,59 @@ void main() {
       await submit(tester);
 
       expect(find.text('Create a channel'), findsNothing);
+    });
+
+    testWidgets('creates the channel when Enter is pressed in Name', (
+      tester,
+    ) async {
+      await openModal(tester);
+      notifier.result = Success<Channel>(
+        Channel(
+          id: 'c1',
+          name: 'general',
+          description: '',
+          organisationId: 'org-1',
+          ownerId: 'user-1',
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField).first, 'general');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(notifier.createCalls, 1);
+      expect(find.text('Create a channel'), findsNothing);
+    });
+
+    testWidgets('does nothing when Enter is pressed with an empty name', (
+      tester,
+    ) async {
+      await openModal(tester);
+
+      await tester.enterText(find.byType(TextField).first, '   ');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(notifier.createCalls, 0);
+      expect(find.text('Create a channel'), findsOneWidget);
+    });
+
+    testWidgets('creates once when Enter is pressed again during a create', (
+      tester,
+    ) async {
+      await openModal(tester);
+      notifier.pending = Completer<void>();
+
+      await tester.enterText(find.byType(TextField).first, 'general');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.showKeyboard(find.byType(TextField).first);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      notifier.pending!.complete();
+      await tester.pumpAndSettle();
+
+      expect(notifier.createCalls, 1);
     });
   });
 }

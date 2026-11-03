@@ -97,6 +97,10 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
+              // Enter creates the channel the same way as the Create button;
+              // _createChannel ignores an empty name and a create in progress.
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _createChannel(),
               decoration: InputDecoration(
                 hintText: 'e.g. plan-budget',
                 border: OutlineInputBorder(
