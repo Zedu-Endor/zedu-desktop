@@ -69,4 +69,81 @@ void main() {
     expect(state().sort, FilesSort.oldestFirst);
     expect(state().query, before);
   });
+
+  group('uploadFiles', () {
+    late ProviderContainer uploads;
+    late _UploadRepository repository;
+
+    setUp(() {
+      repository = _UploadRepository();
+      uploads = ProviderContainer(
+        overrides: [
+          currentOrgIdProvider.overrideWithValue('org-1'),
+          filesRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(uploads.dispose);
+    });
+
+    test('uploads each file and reports the failures', () async {
+      final outcome = await uploads
+          .read(filesActionsProvider.notifier)
+          .uploadFiles([
+            XFile('/tmp/a.png', name: 'a.png'),
+            XFile('/tmp/bad.pdf', name: 'bad.pdf'),
+            XFile('/tmp/c.txt', name: 'c.txt'),
+          ]);
+
+      expect(repository.uploaded, ['a.png', 'bad.pdf', 'c.txt']);
+      expect(outcome.uploaded, 2);
+      expect(outcome.failedNames, ['bad.pdf']);
+      expect(uploads.read(filesActionsProvider).isUploading, isFalse);
+    });
+
+    test('shows the top-level Files tab afterwards', () async {
+      uploads.read(filesProvider.notifier)
+        ..selectView(FilesScope.trash)
+        ..openFolder(_docs)
+        ..setTab(FilesTab.folders);
+
+      await uploads.read(filesActionsProvider.notifier).uploadFiles([
+        XFile('/tmp/a.png', name: 'a.png'),
+      ]);
+
+      final state = uploads.read(filesProvider);
+      expect(state.view, FilesScope.all);
+      expect(state.folderPath, isEmpty);
+      expect(state.tab, FilesTab.files);
+    });
+  });
+}
+
+class _UploadRepository implements FilesRepository {
+  final uploaded = <String>[];
+
+  @override
+  Future<Result<WorkspaceFile>> uploadFile(XFile file) async {
+    uploaded.add(file.name);
+    return file.name.startsWith('bad')
+        ? const Failure(ApiFailure(message: 'too large'))
+        : Success(WorkspaceFile(id: file.name, name: file.name));
+  }
+
+  @override
+  Future<Result<FilesPage>> fetchFiles(FilesQuery query) async =>
+      const Success(FilesPage(files: []));
+
+  @override
+  Future<Result<FoldersPage>> fetchFolders({
+    required FilesScope view,
+    String? parentId,
+    int page = 1,
+  }) async => const Success(FoldersPage(folders: []));
+
+  @override
+  Future<Result<void>> createFolder({
+    required String name,
+    required String orgId,
+    String? parentId,
+  }) async => const Success(null);
 }

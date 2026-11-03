@@ -8,6 +8,7 @@ export 'presentation/providers/files_notifier.dart';
 export 'presentation/providers/files_providers_di.dart';
 export 'presentation/providers/files_state.dart';
 export 'presentation/views/files_view.dart';
+export 'presentation/widgets/create_folder_dialog.dart';
 export 'presentation/widgets/files_sidebar.dart';
 export 'presentation/widgets/files_tables.dart';
 export 'presentation/widgets/files_toolbar.dart';
