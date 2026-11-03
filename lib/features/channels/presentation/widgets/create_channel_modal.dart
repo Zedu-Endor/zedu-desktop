@@ -106,6 +106,9 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
+              // Name is the first field, so typing as soon as the dialog
+              // opens goes straight into it.
+              autofocus: true,
               onChanged: (_) {
                 if (_errorMessage != null) {
                   setState(() => _errorMessage = null);

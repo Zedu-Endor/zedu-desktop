@@ -182,5 +182,22 @@ void main() {
 
       expect(find.text('Channel name is required'), findsNothing);
     });
+
+    testWidgets('focuses Name when the dialog opens', (tester) async {
+      await openModal(tester);
+
+      final nameField = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byType(TextField).first,
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(nameField.focusNode.hasFocus, isTrue);
+
+      // Typing without clicking anything lands in Name.
+      tester.testTextInput.enterText('general');
+      await tester.pump();
+      expect(nameField.controller.text, 'general');
+    });
   });
 }
