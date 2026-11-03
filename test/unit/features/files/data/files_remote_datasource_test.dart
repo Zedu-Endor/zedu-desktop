@@ -5,13 +5,20 @@ import '../../../../helpers/helpers.dart';
 
 class MockApiBaseService extends Mock implements ApiBaseService {}
 
+class MockDio extends Mock implements Dio {}
+
 void main() {
   late MockApiBaseService api;
+  late MockDio downloadClient;
   late FilesRemoteDataSourceImpl datasource;
 
   setUp(() {
     api = MockApiBaseService();
-    datasource = FilesRemoteDataSourceImpl(apiBaseService: api);
+    downloadClient = MockDio();
+    datasource = FilesRemoteDataSourceImpl(
+      apiBaseService: api,
+      downloadClient: downloadClient,
+    );
   });
 
   group('fetchFiles', () {
@@ -146,6 +153,98 @@ void main() {
       );
 
       expect(await datasource.fetchFolders(view: FilesScope.all), isEmpty);
+    });
+  });
+
+  group('fetchFileLink', () {
+    test('reads the link from the file details', () async {
+      when(
+        () => api.get<Map<String, dynamic>>(path: '/files/file/f-1'),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {
+            'data': {'file_link': ' https://cdn.zedu.test/logo.png '},
+          },
+        ),
+      );
+
+      expect(
+        await datasource.fetchFileLink('f-1'),
+        'https://cdn.zedu.test/logo.png',
+      );
+    });
+
+    test('is empty when the details have no link', () async {
+      when(
+        () => api.get<Map<String, dynamic>>(path: '/files/file/f-1'),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {'data': null},
+        ),
+      );
+
+      expect(await datasource.fetchFileLink('f-1'), isEmpty);
+    });
+  });
+
+  group('downloadFile', () {
+    test('saves the link to the chosen path and reports progress', () async {
+      when(
+        () => downloadClient.download(
+          any(),
+          any<dynamic>(),
+          onReceiveProgress: any(named: 'onReceiveProgress'),
+        ),
+      ).thenAnswer((invocation) async {
+        final onProgress =
+            invocation.namedArguments[#onReceiveProgress] as ProgressCallback;
+        onProgress(50, 100);
+        return Response<dynamic>(requestOptions: RequestOptions());
+      });
+      final progress = <(int, int)>[];
+
+      await datasource.downloadFile(
+        url: 'https://cdn.zedu.test/logo.png',
+        savePath: '/Users/ada/Downloads/logo.png',
+        onProgress: (received, total) => progress.add((received, total)),
+      );
+
+      verify(
+        () => downloadClient.download(
+          'https://cdn.zedu.test/logo.png',
+          '/Users/ada/Downloads/logo.png',
+          onReceiveProgress: any(named: 'onReceiveProgress'),
+        ),
+      ).called(1);
+      expect(progress, [(50, 100)]);
+    });
+
+    test('turns a failed request into an ApiFailure', () async {
+      when(
+        () => downloadClient.download(
+          any(),
+          any<dynamic>(),
+          onReceiveProgress: any(named: 'onReceiveProgress'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/logo.png'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/logo.png'),
+            statusCode: 404,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        datasource.downloadFile(url: 'https://cdn.zedu.test/x', savePath: '/x'),
+        throwsA(
+          isA<ApiFailure>().having((e) => e.statusCode, 'statusCode', 404),
+        ),
+      );
     });
   });
 }

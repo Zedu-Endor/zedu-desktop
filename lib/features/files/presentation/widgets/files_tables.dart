@@ -205,23 +205,35 @@ class FilesTable extends StatelessWidget {
     required this.files,
     required this.ownerNameOf,
     required this.onOpen,
+    this.onDownload,
+    this.downloads = const {},
   });
 
   final List<WorkspaceFile> files;
   final String Function(WorkspaceFile file) ownerNameOf;
   final ValueChanged<WorkspaceFile> onOpen;
 
+  /// Downloads a file. When null, as in Deleted files, rows have no actions
+  /// menu.
+  final ValueChanged<WorkspaceFile>? onDownload;
+
+  /// Downloads in progress, by file id: the share downloaded, or null while
+  /// the size is unknown.
+  final Map<String, double?> downloads;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final download = onDownload;
 
     return _Table(
-      columns: const [
-        _Column('Name', 5),
-        _Column('Shared in', 2, compact: false),
-        _Column('Owner', 2, compact: false),
-        _Column('Date Modified', 2),
-        _Column('Size', 1),
+      columns: [
+        const _Column('Name', 5),
+        const _Column('Shared in', 2, compact: false),
+        const _Column('Owner', 2, compact: false),
+        const _Column('Date Modified', 2),
+        const _Column('Size', 1),
+        if (download != null) const _Column('', 1),
       ],
       rowCount: files.length,
       onTapRow: (r) => onOpen(files[r]),
@@ -251,8 +263,103 @@ class FilesTable extends StatelessWidget {
           _cellText(context, ownerNameOf(file)),
           _cellText(context, formatFileDate(file.modifiedAt)),
           _cellText(context, formatFileSize(file.size)),
+          if (download != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: _FileActionsMenu(
+                fileName: file.name,
+                isDownloading: downloads.containsKey(file.id),
+                progress: downloads[file.id],
+                onDownload: () => download(file),
+              ),
+            ),
         ];
       },
+    );
+  }
+}
+
+enum _FileAction { download }
+
+/// The ⋮ menu of a file row, holding the actions on that file. While the file
+/// downloads it shows a progress ring instead.
+class _FileActionsMenu extends StatelessWidget {
+  const _FileActionsMenu({
+    required this.fileName,
+    required this.isDownloading,
+    required this.progress,
+    required this.onDownload,
+  });
+
+  final String fileName;
+  final bool isDownloading;
+  final double? progress;
+  final VoidCallback onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    if (isDownloading) {
+      final percent = progress == null ? '' : ' ${(progress! * 100).round()}%';
+      return Tooltip(
+        message: 'Downloading$percent',
+        child: SizedBox.square(
+          dimension: 32,
+          child: Padding(
+            padding: const EdgeInsets.all(7),
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 2,
+              color: colors.primary,
+              backgroundColor: colors.divider,
+            ),
+          ),
+        ),
+      );
+    }
+
+    PopupMenuItem<_FileAction> item(
+      _FileAction value,
+      IconData icon,
+      String label,
+    ) => PopupMenuItem(
+      value: value,
+      height: 40,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: colors.textSecondary),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: context.textTheme.bodyMedium?.copyWith(
+              fontSize: 13,
+              color: colors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return PopupMenuButton<_FileAction>(
+      tooltip: 'More actions for $fileName',
+      position: PopupMenuPosition.under,
+      color: colors.onPrimary,
+      padding: EdgeInsets.zero,
+      iconSize: 20,
+      constraints: const BoxConstraints(minWidth: 160),
+      style: IconButton.styleFrom(
+        fixedSize: const Size.square(32),
+        minimumSize: const Size.square(32),
+        padding: EdgeInsets.zero,
+      ),
+      icon: Icon(Icons.more_vert, color: colors.textSecondary),
+      onSelected: (action) => switch (action) {
+        _FileAction.download => onDownload(),
+      },
+      itemBuilder: (context) => [
+        item(_FileAction.download, Icons.download_outlined, 'Download'),
+      ],
     );
   }
 }

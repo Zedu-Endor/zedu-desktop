@@ -221,10 +221,49 @@ class _FilesSection extends ConsumerWidget {
     }
   }
 
+  Future<void> _download(
+    BuildContext context,
+    WidgetRef ref,
+    WorkspaceFile file,
+  ) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final outcome = await ref
+        .read(fileDownloadsProvider.notifier)
+        .download(file);
+    if (!overlay.mounted) return;
+    switch (outcome.status) {
+      case FileDownloadStatus.cancelled:
+        return;
+      case FileDownloadStatus.saved:
+        final folder = _folderName(outcome.path!);
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.success,
+          message: folder.isEmpty
+              ? 'Downloaded ${file.name}.'
+              : 'Downloaded ${file.name} to $folder.',
+        );
+      case FileDownloadStatus.failed:
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.error,
+          message: outcome.message!,
+        );
+    }
+  }
+
+  /// Name of the folder holding [path], such as `Downloads`.
+  static String _folderName(String path) {
+    final parts = path.split(RegExp(r'[\\/]'))..removeWhere((p) => p.isEmpty);
+    return parts.length < 2 ? '' : parts[parts.length - 2];
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final page = ref.watch(filesListProvider);
     final sort = ref.watch(filesProvider.select((s) => s.sort));
+    final scope = ref.watch(filesProvider.select((s) => s.view));
+    final downloads = ref.watch(fileDownloadsProvider);
     final ownerName = _ownerNames(ref);
 
     return page.when(
@@ -252,6 +291,10 @@ class _FilesSection extends ConsumerWidget {
               ownerNameOf: (file) =>
                   file.owner.isNotEmpty ? file.owner : ownerName(file.userId),
               onOpen: _open,
+              downloads: downloads,
+              onDownload: scope == FilesScope.trash
+                  ? null
+                  : (file) => _download(context, ref, file),
             ),
             if (page.totalPages > 1) _Pagination(page: page),
           ],

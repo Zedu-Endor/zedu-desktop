@@ -32,4 +32,38 @@ class FilesRepositoryImpl implements FilesRepository {
       return Failure(ApiFailure(message: e.toString()));
     }
   }
+
+  @override
+  Future<Result<void>> downloadFile({
+    required WorkspaceFile file,
+    required String savePath,
+    void Function(double? progress)? onProgress,
+  }) async {
+    try {
+      final link = file.link.isNotEmpty
+          ? file.link
+          : await remoteDataSource.fetchFileLink(file.id);
+      if (link.isEmpty) {
+        return const Failure(
+          ApiFailure(
+            message: 'This file has no download link.',
+            kind: ApiFailureKind.client,
+          ),
+        );
+      }
+      await remoteDataSource.downloadFile(
+        url: link,
+        savePath: savePath,
+        onProgress: onProgress == null
+            ? null
+            : (received, total) =>
+                  onProgress(total > 0 ? received / total : null),
+      );
+      return const Success(null);
+    } on ApiFailure catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(ApiFailure(message: e.toString()));
+    }
+  }
 }

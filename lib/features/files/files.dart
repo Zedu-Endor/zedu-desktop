@@ -4,6 +4,7 @@ export 'domain/entities/file_folder.dart';
 export 'domain/entities/files_query.dart';
 export 'domain/entities/workspace_file.dart';
 export 'domain/repositories/files_repository.dart';
+export 'presentation/providers/file_downloads_notifier.dart';
 export 'presentation/providers/files_notifier.dart';
 export 'presentation/providers/files_providers_di.dart';
 export 'presentation/providers/files_state.dart';

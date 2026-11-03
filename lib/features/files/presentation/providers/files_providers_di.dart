@@ -23,3 +23,17 @@ final foldersListProvider =
     AsyncNotifierProvider<FoldersListNotifier, List<FileFolder>>(
       FoldersListNotifier.new,
     );
+
+final saveLocationPickerProvider = Provider<SaveLocationPicker>(
+  (ref) =>
+      (fileName) => FilePicker.saveFile(
+        dialogTitle: 'Save file',
+        fileName: fileName,
+        lockParentWindow: true,
+      ),
+);
+
+final fileDownloadsProvider =
+    NotifierProvider<FileDownloadsNotifier, Map<String, double?>>(
+      FileDownloadsNotifier.new,
+    );
