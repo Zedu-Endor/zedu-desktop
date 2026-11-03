@@ -146,4 +146,34 @@ void main() {
       ),
     );
   });
+
+  group('deleteFile', () {
+    test('passes the request on and succeeds', () async {
+      when(
+        () => remote.deleteFile('f-1', permanent: true),
+      ).thenAnswer((_) async {});
+
+      final result = await repository.deleteFile('f-1', permanent: true);
+
+      expect(result, isA<Success<void>>());
+      verify(() => remote.deleteFile('f-1', permanent: true)).called(1);
+    });
+
+    test('returns the failure when the server refuses', () async {
+      when(() => remote.deleteFile('f-1')).thenThrow(
+        const ApiFailure(message: 'nope', kind: ApiFailureKind.forbidden),
+      );
+
+      final result = await repository.deleteFile('f-1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having(
+          (f) => f.error.kind,
+          'kind',
+          ApiFailureKind.forbidden,
+        ),
+      );
+    });
+  });
 }

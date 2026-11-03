@@ -247,4 +247,38 @@ void main() {
       );
     });
   });
+
+  group('deleteFile', () {
+    void stubDelete() =>
+        when(
+          () => api.delete<dynamic>(
+            path: any(named: 'path'),
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              const ApiResponseModel<dynamic>(statusCode: 200, data: null),
+        );
+
+    test('moves the file to Deleted files', () async {
+      stubDelete();
+
+      await datasource.deleteFile('f-1');
+
+      verify(() => api.delete<dynamic>(path: '/files/file/f-1')).called(1);
+    });
+
+    test('deletes it for good when permanent', () async {
+      stubDelete();
+
+      await datasource.deleteFile('f-1', permanent: true);
+
+      verify(
+        () => api.delete<dynamic>(
+          path: '/files/file/f-1',
+          queryParameters: {'permanent': true},
+        ),
+      ).called(1);
+    });
+  });
 }

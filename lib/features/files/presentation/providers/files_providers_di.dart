@@ -37,3 +37,8 @@ final fileDownloadsProvider =
     NotifierProvider<FileDownloadsNotifier, Map<String, double?>>(
       FileDownloadsNotifier.new,
     );
+
+final fileDeletionsProvider =
+    NotifierProvider<FileDeletionsNotifier, Set<String>>(
+      FileDeletionsNotifier.new,
+    );

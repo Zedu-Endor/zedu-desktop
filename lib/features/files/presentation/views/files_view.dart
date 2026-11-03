@@ -252,6 +252,27 @@ class _FilesSection extends ConsumerWidget {
     }
   }
 
+  Future<void> _delete(
+    BuildContext context,
+    WorkspaceFile file, {
+    required bool permanent,
+  }) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final deleted = await DeleteFileDialog.show(
+      context,
+      file: file,
+      permanent: permanent,
+    );
+    if (!deleted || !overlay.mounted) return;
+    AppToastService.showWith(
+      overlay,
+      type: AppToastType.success,
+      message: permanent
+          ? 'Deleted ${file.name} permanently.'
+          : 'Moved ${file.name} to Deleted files.',
+    );
+  }
+
   /// Name of the folder holding [path], such as `Downloads`.
   static String _folderName(String path) {
     final parts = path.split(RegExp(r'[\\/]'))..removeWhere((p) => p.isEmpty);
@@ -295,6 +316,9 @@ class _FilesSection extends ConsumerWidget {
               onDownload: scope == FilesScope.trash
                   ? null
                   : (file) => _download(context, ref, file),
+              onDelete: (file) =>
+                  _delete(context, file, permanent: scope == FilesScope.trash),
+              deletesPermanently: scope == FilesScope.trash,
             ),
             if (page.totalPages > 1) _Pagination(page: page),
           ],

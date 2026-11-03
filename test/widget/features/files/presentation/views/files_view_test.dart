@@ -38,6 +38,17 @@ class _FakeFilesRepository implements FilesRepository {
   final queries = <FilesQuery>[];
   final folderRequests = <(FilesScope, String?)>[];
   final downloads = <(String, String)>[];
+  final deletes = <(String, bool)>[];
+  Result<void> deleteResult = const Success(null);
+
+  @override
+  Future<Result<void>> deleteFile(
+    String fileId, {
+    bool permanent = false,
+  }) async {
+    deletes.add((fileId, permanent));
+    return deleteResult;
+  }
 
   /// What a download returns; complete it to finish the download.
   Completer<Result<void>> download = Completer()..complete(const Success(null));
@@ -304,14 +315,93 @@ void main() {
     expect(repository.downloads, isEmpty);
   });
 
-  testWidgets('deleted files have no actions menu', (tester) async {
-    await _pump(tester, _FakeFilesRepository());
+  Future<void> chooseInMenu(WidgetTester tester, String label) async {
+    await tester.tap(actionsMenu());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(label));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('deletes a file after confirming', (tester) async {
+    final repository = _FakeFilesRepository();
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+    final loads = repository.queries.length;
+
+    await chooseInMenu(tester, 'Delete');
+    expect(find.text('Delete file?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deletes, [('f-1', false)]);
+    expect(find.text('Delete file?'), findsNothing);
+    expect(find.text('Moved logo.png to Deleted files.'), findsOneWidget);
+    // The list reloads, so the file leaves it.
+    expect(repository.queries.length, loads + 1);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a failed delete keeps the dialog open with the reason', (
+    tester,
+  ) async {
+    final repository = _FakeFilesRepository()
+      ..deleteResult = const Failure(
+        ApiFailure(message: 'nope', kind: ApiFailureKind.forbidden),
+      );
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+    final loads = repository.queries.length;
+
+    await chooseInMenu(tester, 'Delete');
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete file?'), findsOneWidget);
+    expect(
+      find.text(
+        'Could not delete logo.png. You don\'t have permission to do that.',
+      ),
+      findsOneWidget,
+    );
+    expect(repository.queries.length, loads);
+  });
+
+  testWidgets('cancelling the delete keeps the file', (tester) async {
+    final repository = _FakeFilesRepository();
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+
+    await chooseInMenu(tester, 'Delete');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deletes, isEmpty);
+    expect(find.text('logo.png'), findsOneWidget);
+  });
+
+  testWidgets('deleted files can only be deleted permanently', (tester) async {
+    final repository = _FakeFilesRepository();
+    await _pump(tester, repository);
 
     await tester.tap(find.text('Deleted files'));
     await tester.pumpAndSettle();
     await openFilesTab(tester);
 
-    expect(find.text('logo.png'), findsOneWidget);
-    expect(actionsMenu(), findsNothing);
+    await tester.tap(actionsMenu());
+    await tester.pumpAndSettle();
+    expect(find.text('Download'), findsNothing);
+    await tester.tap(find.text('Delete permanently'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete file permanently?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deletes, [('f-1', true)]);
+    expect(find.text('Deleted logo.png permanently.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 }

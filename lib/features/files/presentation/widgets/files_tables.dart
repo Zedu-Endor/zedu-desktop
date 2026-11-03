@@ -206,6 +206,8 @@ class FilesTable extends StatelessWidget {
     required this.ownerNameOf,
     required this.onOpen,
     this.onDownload,
+    this.onDelete,
+    this.deletesPermanently = false,
     this.downloads = const {},
   });
 
@@ -213,9 +215,16 @@ class FilesTable extends StatelessWidget {
   final String Function(WorkspaceFile file) ownerNameOf;
   final ValueChanged<WorkspaceFile> onOpen;
 
-  /// Downloads a file. When null, as in Deleted files, rows have no actions
-  /// menu.
+  /// Downloads a file. When null, as in Deleted files, the menu has no
+  /// Download.
   final ValueChanged<WorkspaceFile>? onDownload;
+
+  /// Deletes a file. When null, the menu has no Delete.
+  final ValueChanged<WorkspaceFile>? onDelete;
+
+  /// Whether Delete removes files for good, as in Deleted files. The menu then
+  /// says Delete permanently.
+  final bool deletesPermanently;
 
   /// Downloads in progress, by file id: the share downloaded, or null while
   /// the size is unknown.
@@ -225,6 +234,8 @@ class FilesTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final download = onDownload;
+    final delete = onDelete;
+    final hasActions = download != null || delete != null;
 
     return _Table(
       columns: [
@@ -233,7 +244,7 @@ class FilesTable extends StatelessWidget {
         const _Column('Owner', 2, compact: false),
         const _Column('Date Modified', 2),
         const _Column('Size', 1),
-        if (download != null) const _Column('', 1),
+        if (hasActions) const _Column('', 1),
       ],
       rowCount: files.length,
       onTapRow: (r) => onOpen(files[r]),
@@ -263,14 +274,18 @@ class FilesTable extends StatelessWidget {
           _cellText(context, ownerNameOf(file)),
           _cellText(context, formatFileDate(file.modifiedAt)),
           _cellText(context, formatFileSize(file.size)),
-          if (download != null)
+          if (hasActions)
             Align(
               alignment: Alignment.centerRight,
               child: _FileActionsMenu(
                 fileName: file.name,
                 isDownloading: downloads.containsKey(file.id),
                 progress: downloads[file.id],
-                onDownload: () => download(file),
+                onDownload: download == null ? null : () => download(file),
+                onDelete: delete == null ? null : () => delete(file),
+                deleteLabel: deletesPermanently
+                    ? 'Delete permanently'
+                    : 'Delete',
               ),
             ),
         ];
@@ -279,7 +294,7 @@ class FilesTable extends StatelessWidget {
   }
 }
 
-enum _FileAction { download }
+enum _FileAction { download, delete }
 
 /// The ⋮ menu of a file row, holding the actions on that file. While the file
 /// downloads it shows a progress ring instead.
@@ -289,12 +304,16 @@ class _FileActionsMenu extends StatelessWidget {
     required this.isDownloading,
     required this.progress,
     required this.onDownload,
+    required this.onDelete,
+    required this.deleteLabel,
   });
 
   final String fileName;
   final bool isDownloading;
   final double? progress;
-  final VoidCallback onDownload;
+  final VoidCallback? onDownload;
+  final VoidCallback? onDelete;
+  final String deleteLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -322,19 +341,24 @@ class _FileActionsMenu extends StatelessWidget {
     PopupMenuItem<_FileAction> item(
       _FileAction value,
       IconData icon,
-      String label,
-    ) => PopupMenuItem(
+      String label, {
+      bool destructive = false,
+    }) => PopupMenuItem(
       value: value,
       height: 40,
       child: Row(
         children: [
-          Icon(icon, size: 18, color: colors.textSecondary),
+          Icon(
+            icon,
+            size: 18,
+            color: destructive ? colors.error : colors.textSecondary,
+          ),
           const SizedBox(width: 12),
           Text(
             label,
             style: context.textTheme.bodyMedium?.copyWith(
               fontSize: 13,
-              color: colors.textPrimary,
+              color: destructive ? colors.error : colors.textPrimary,
             ),
           ),
         ],
@@ -355,10 +379,19 @@ class _FileActionsMenu extends StatelessWidget {
       ),
       icon: Icon(Icons.more_vert, color: colors.textSecondary),
       onSelected: (action) => switch (action) {
-        _FileAction.download => onDownload(),
+        _FileAction.download => onDownload?.call(),
+        _FileAction.delete => onDelete?.call(),
       },
       itemBuilder: (context) => [
-        item(_FileAction.download, Icons.download_outlined, 'Download'),
+        if (onDownload != null)
+          item(_FileAction.download, Icons.download_outlined, 'Download'),
+        if (onDelete != null)
+          item(
+            _FileAction.delete,
+            Icons.delete_outline,
+            deleteLabel,
+            destructive: true,
+          ),
       ],
     );
   }

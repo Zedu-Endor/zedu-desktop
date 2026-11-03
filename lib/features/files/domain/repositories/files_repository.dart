@@ -18,4 +18,8 @@ abstract class FilesRepository {
     required String savePath,
     void Function(double? progress)? onProgress,
   });
+
+  /// Deletes [fileId]: moves it to Deleted files, or removes it for good when
+  /// [permanent].
+  Future<Result<void>> deleteFile(String fileId, {bool permanent = false});
 }
