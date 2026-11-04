@@ -629,6 +629,13 @@ class _InviteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
+    void openInviteModal() {
+      showDialog<void>(
+        context: context,
+        builder: (context) => const InviteTeammatesModal(),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final inviteButton = AppButton(
@@ -648,12 +655,7 @@ class _InviteCard extends StatelessWidget {
               return null;
             }),
           ),
-          onPressed: () {
-            showDialog<void>(
-              context: context,
-              builder: (context) => const InviteTeammatesModal(),
-            );
-          },
+          onPressed: openInviteModal,
         );
 
         final invitationDetails = Row(
@@ -699,24 +701,28 @@ class _InviteCard extends StatelessWidget {
             side: BorderSide(color: colors.divider),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: constraints.maxWidth < 640
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      invitationDetails,
-                      const SizedBox(height: 16),
-                      inviteButton,
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(child: invitationDetails),
-                      const SizedBox(width: 16),
-                      inviteButton,
-                    ],
-                  ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: openInviteModal,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: constraints.maxWidth < 640
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        invitationDetails,
+                        const SizedBox(height: 16),
+                        inviteButton,
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: invitationDetails),
+                        const SizedBox(width: 16),
+                        inviteButton,
+                      ],
+                    ),
+            ),
           ),
         );
       },
