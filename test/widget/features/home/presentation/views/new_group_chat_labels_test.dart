@@ -8,6 +8,12 @@ class _FakeUserProfileNotifier extends UserProfileNotifier {
   UserProfileState build() => const UserProfileState();
 }
 
+// The page also suggests channels, so keep this test off the real network.
+class _FakeChannelNotifier extends ChannelNotifier {
+  @override
+  Future<List<Channel>> build() async => const [];
+}
+
 void main() {
   testWidgets('labels the page New message and the recipients To', (
     tester,
@@ -23,6 +29,7 @@ void main() {
           userProfileNotifierProvider.overrideWith(
             _FakeUserProfileNotifier.new,
           ),
+          channelProvider.overrideWith(_FakeChannelNotifier.new),
         ],
         child: buildTestMaterialApp(const Scaffold(body: NewGroupChatView())),
       ),
