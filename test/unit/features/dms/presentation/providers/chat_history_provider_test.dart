@@ -19,6 +19,7 @@ class _MemoryStorage extends Fake implements SecureStorageService {
 }
 
 void main() {
+  _lifecycleTests();
   _deleteTests();
   _retryTests();
   _clearHistoryTests();
@@ -434,6 +435,43 @@ void _loadErrorTests() {
       expect(notifier.page, 2);
       expect(notifier.messages.last['id'], 'b0');
     });
+  });
+}
+
+void _lifecycleTests() {
+  group('chatHistoryProvider lifecycle (Ziki #2580)', () {
+    test(
+      'auto-disposes and cancels polling when all listeners are detached',
+      () async {
+        final mockRepository = MockDmRepository();
+        when(
+          () => mockRepository.getMessages(any(), page: any(named: 'page')),
+        ).thenAnswer((_) async => []);
+
+        final container = ProviderContainer(
+          overrides: [dmRepositoryProvider.overrideWithValue(mockRepository)],
+        );
+        addTearDown(container.dispose);
+
+        final sub = container.listen(
+          chatHistoryProvider('channel-lifecycle'),
+          (_, _) {},
+        );
+        final historyNotifier = container.read(
+          chatHistoryProvider('channel-lifecycle'),
+        );
+        await pumpEventQueue();
+
+        // ignore: invalid_use_of_protected_member
+        expect(() => historyNotifier.notifyListeners(), returnsNormally);
+
+        sub.close();
+        await pumpEventQueue();
+
+        // ignore: invalid_use_of_protected_member
+        expect(() => historyNotifier.notifyListeners(), throwsFlutterError);
+      },
+    );
   });
 }
 
