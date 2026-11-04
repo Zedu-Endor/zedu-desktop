@@ -168,7 +168,10 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
       if (hadNew) {
         // Prepend only the genuinely new messages at the top.
-        final existingIds = messages.map((m) => m['id']?.toString()).toSet();
+        final existingIds = messages
+            .expand((m) => [m['id']?.toString(), m['thread_id']?.toString()])
+            .whereType<String>()
+            .toSet();
         final newOnly = fresh
             .where(
               (m) =>
@@ -186,6 +189,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
       // Silent — polling failures should not surface to the UI.
     }
   }
+
+  @visibleForTesting
+  Future<void> pollForNewMessages() => _pollForNewMessages();
 
   @override
   void dispose() {
@@ -306,6 +312,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
       );
       _sendOptions.remove(tempId);
       _deleteRecordings(media);
+      _seenIds.add(threadId);
 
       messages = messages.map((m) {
         if (m['id'] == tempId) {
@@ -354,6 +361,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
       );
       _sendOptions.remove(messageId);
       _deleteRecordings(options?.media);
+      _seenIds.add(threadId);
 
       messages = messages.map((m) {
         if (m['id'] == messageId) {

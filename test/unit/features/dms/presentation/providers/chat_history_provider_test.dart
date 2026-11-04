@@ -19,6 +19,7 @@ class _MemoryStorage extends Fake implements SecureStorageService {
 }
 
 void main() {
+  _pollingDeduplicationTests();
   _deleteTests();
   _retryTests();
   _clearHistoryTests();
@@ -433,6 +434,61 @@ void _loadErrorTests() {
       expect(notifier.loadMoreFailed, isFalse);
       expect(notifier.page, 2);
       expect(notifier.messages.last['id'], 'b0');
+    });
+  });
+}
+
+void _pollingDeduplicationTests() {
+  group('ChatHistoryNotifier polling deduplication (Ziki #2596)', () {
+    late MockDmRepository mockRepository;
+    late ProviderContainer container;
+    late ChatHistoryNotifier notifier;
+
+    setUp(() async {
+      mockRepository = MockDmRepository();
+      when(
+        () => mockRepository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer((_) async => []);
+
+      container = ProviderContainer(
+        overrides: [
+          dmRepositoryProvider.overrideWithValue(mockRepository),
+          authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+        ],
+      );
+      notifier = container
+          .listen(chatHistoryProvider('ch-dedup'), (_, _) {})
+          .read();
+      await pumpEventQueue();
+    });
+
+    tearDown(() => container.dispose());
+
+    test('polling does not duplicate a message that was just sent', () async {
+      when(
+        () => mockRepository.sendMessage(
+          any(),
+          any(),
+          media: any(named: 'media'),
+          mentions: any(named: 'mentions'),
+          isChannel: any(named: 'isChannel'),
+        ),
+      ).thenAnswer((_) async => 'server-msg-123');
+
+      await notifier.sendMessage('Hello world');
+
+      expect(notifier.messages.length, 1);
+      expect(notifier.messages.first['thread_id'], 'server-msg-123');
+
+      when(() => mockRepository.getMessages(any(), page: 1)).thenAnswer(
+        (_) async => [
+          {'id': 'server-msg-123', 'content': 'Hello world', 'user_id': 'u1'},
+        ],
+      );
+
+      await notifier.pollForNewMessages();
+
+      expect(notifier.messages.length, 1);
     });
   });
 }
