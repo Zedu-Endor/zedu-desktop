@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/core.dart';
@@ -11,6 +13,9 @@ class _FakeAuthNotifier extends AuthNotifier {
   final AuthState _initial;
   StatusTimeout? savedTimeout;
   bool? savedPauseNotifications;
+  String? savedText;
+  int saveCalls = 0;
+  Completer<bool>? saveCompleter;
 
   @override
   AuthState build() => _initial;
@@ -22,9 +27,11 @@ class _FakeAuthNotifier extends AuthNotifier {
     required StatusTimeout timeout,
     required bool pauseNotifications,
   }) async {
+    saveCalls++;
+    savedText = text;
     savedTimeout = timeout;
     savedPauseNotifications = pauseNotifications;
-    return true;
+    return saveCompleter?.future ?? true;
   }
 }
 
@@ -78,6 +85,39 @@ MouseCursor _activeCursor() =>
     RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1)!;
 
 void main() {
+  group('SetStatusDialog keyboard submission', () {
+    testWidgets('Enter saves the typed status', (tester) async {
+      final notifier = _FakeAuthNotifier();
+      await _pumpDialog(tester, notifier: () => notifier);
+
+      await tester.enterText(find.byType(TextField), 'Deep work');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(notifier.saveCalls, 1);
+      expect(notifier.savedText, 'Deep work');
+    });
+
+    testWidgets('Enter cannot start a second save while one is pending', (
+      tester,
+    ) async {
+      final notifier = _FakeAuthNotifier();
+      notifier.saveCompleter = Completer<bool>();
+      await _pumpDialog(tester, notifier: () => notifier);
+
+      await tester.enterText(find.byType(TextField), 'Deep work');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(notifier.saveCalls, 1);
+
+      notifier.saveCompleter!.complete(true);
+      await tester.pumpAndSettle();
+    });
+  });
+
   group('SetStatusDialog suggested statuses', () {
     testWidgets('shows no selected suggestion initially', (tester) async {
       await _pumpDialog(tester);
