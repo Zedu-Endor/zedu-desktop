@@ -30,7 +30,32 @@ class _WorkspaceSwitcherHeaderState
 
     if (selectedWorkspace == null) {
       final errorMessage = workspaceState.errorMessage;
-      if (errorMessage == null) return const SizedBox.shrink();
+      if (errorMessage == null) {
+        if (workspaceState.isLoading) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'No organization',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colors.onPrimary.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.push(AppRouter.createOrganization),
+                child: Text(
+                  'Create one',
+                  style: TextStyle(color: colors.onPrimary),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(

@@ -49,6 +49,29 @@ void main() {
     );
   });
 
+  testWidgets('opens a URL in a message when it is tapped', (tester) async {
+    final opened = <Uri>[];
+    final original = messageLinkLauncher;
+    messageLinkLauncher = (uri) async {
+      opened.add(uri);
+      return true;
+    };
+    addTearDown(() => messageLinkLauncher = original);
+
+    await pumpList(
+      tester,
+      const Success([
+        ChannelMessage(senderName: 'Ada', text: 'https://example.com/channel'),
+      ]),
+    );
+    await tester.tapAt(
+      tester.getTopLeft(find.byType(SelectableText)) + const Offset(20, 8),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(opened, [Uri.parse('https://example.com/channel')]);
+  });
+
   testWidgets('shows the welcome screen when empty', (tester) async {
     await pumpList(tester, const Success(<ChannelMessage>[]));
 

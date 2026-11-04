@@ -32,6 +32,7 @@ class UserProfileView extends ConsumerWidget {
 
     final state = ref.watch(userProfileNotifierProvider);
     final notifier = ref.read(userProfileNotifierProvider.notifier);
+    final authenticatedUser = ref.watch(authNotifierProvider).user;
     final workspaceName = ref.watch(
       workspaceProvider.select((s) => s.selectedWorkspace?.name),
     );
@@ -42,6 +43,7 @@ class UserProfileView extends ConsumerWidget {
       child: _ProfileContent(
         state: state,
         notifier: notifier,
+        authenticatedUser: authenticatedUser,
         workspaceName: workspaceName,
       ),
     );
@@ -52,11 +54,13 @@ class _ProfileContent extends StatelessWidget {
   const _ProfileContent({
     required this.state,
     required this.notifier,
+    required this.authenticatedUser,
     required this.workspaceName,
   });
 
   final UserProfileState state;
   final UserProfileNotifier notifier;
+  final User? authenticatedUser;
   final String? workspaceName;
 
   static const padding = EdgeInsets.fromLTRB(28, 32, 40, 48);
@@ -85,7 +89,13 @@ class _ProfileContent extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: maxContentWidth),
           child: switch (state.section) {
             UserProfileSection.account => AccountSection(
-              account: state.account ?? ProfileAccount.empty(),
+              account: accountForAuthenticatedUser(
+                state.account ??
+                    (authenticatedUser != null
+                        ? profileAccountFromAuthUser(authenticatedUser!)
+                        : ProfileAccount.empty()),
+                authenticatedUser,
+              ),
               isSaving: state.isSaving,
               onSave: notifier.updateAccount,
               onDelete: notifier.deleteAccount,
@@ -159,4 +169,52 @@ class _OrganizationLoadError extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Builds a [ProfileAccount] from the authenticated user's data, avoiding
+/// placeholder "Anonymous user" values. Used when the profile account hasn't
+/// been loaded from the server yet.
+@visibleForTesting
+ProfileAccount profileAccountFromAuthUser(User authenticatedUser) {
+  final name = authenticatedUser.fullname.trim().isNotEmpty
+      ? authenticatedUser.fullname.trim()
+      : authenticatedUser.username;
+  return ProfileAccount(
+    name: name.isNotEmpty ? name : 'User',
+    email: authenticatedUser.email,
+    timezone: '',
+    avatarUrl: authenticatedUser.avatarUrl,
+    username: authenticatedUser.username,
+  );
+}
+
+/// Populates an account with the authenticated user's credentials if the
+/// loaded account still contains placeholder values.
+@visibleForTesting
+ProfileAccount accountForAuthenticatedUser(ProfileAccount account, User? user) {
+  if (user == null) return account;
+  return account.copyWith(
+    name: _firstNonPlaceholder([account.name, user.fullname, user.username]),
+    email: _firstNonPlaceholder([account.email, user.email]),
+    username: _firstNonPlaceholder([account.username, user.username]),
+    avatarUrl:
+        (account.avatarUrl != null && account.avatarUrl!.trim().isNotEmpty)
+        ? account.avatarUrl
+        : user.avatarUrl,
+  );
+}
+
+String _firstNonPlaceholder(List<String> values) {
+  const placeholders = {
+    'anonymous user',
+    'anonymoususer',
+    'anonymoususer@email.com',
+  };
+  for (final val in values) {
+    final trimmed = val.trim();
+    if (trimmed.isNotEmpty && !placeholders.contains(trimmed.toLowerCase())) {
+      return trimmed;
+    }
+  }
+  return values.firstWhere((v) => v.trim().isNotEmpty, orElse: () => '');
 }

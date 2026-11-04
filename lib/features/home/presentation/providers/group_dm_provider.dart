@@ -132,24 +132,50 @@ class GroupDmNotifier extends Notifier<List<GroupDM>> {
     final network = ref.read(networkStatusProvider);
 
     if (network == NetworkStatus.offline) {
-      // Queue it
-      _offlineQueue.putIfAbsent(groupDmId, () => []).add(messageText);
-      // We can also optimistic UI append it with a pending flag, but for now just append
-      state = [
-        for (final group in state)
-          if (group.id == groupDmId)
-            group.copyWith(
-              messages: [...group.messages, '$messageText (Pending...)'],
-            )
-          else
-            group,
-      ];
+      _offlineQueue.putIfAbsent(groupDmId, () => <String>[]).add(messageText);
+      _appendMessage(groupDmId, _pendingLabel(messageText));
       return;
     }
 
     // Simulate API delay
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
+    _appendMessage(groupDmId, messageText);
+    await _persistMessage(groupDmId, messageText);
+  }
+
+  Future<void> _flushOfflineQueue() async {
+    if (_offlineQueue.isEmpty) return;
+
+    final queued = <String, List<String>>{
+      for (final entry in _offlineQueue.entries)
+        entry.key: List<String>.of(entry.value),
+    };
+    _offlineQueue.clear();
+
+    for (final entry in queued.entries) {
+      for (final messageText in entry.value) {
+        try {
+          // Simulate API delay
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          await _persistMessage(entry.key, messageText);
+          _replacePending(entry.key, messageText);
+        } catch (error) {
+          // Leave the message queued so the next reconnect retries it.
+          _offlineQueue
+              .putIfAbsent(entry.key, () => <String>[])
+              .add(messageText);
+          debugPrint('Could not flush a queued message: $error');
+        }
+      }
+    }
+  }
+
+  Future<void> _persistMessage(String groupDmId, String messageText) async {
+    await ref.read(chatStorageProvider).appendMessage(groupDmId, messageText);
+  }
+
+  void _appendMessage(String groupDmId, String messageText) {
     state = [
       for (final group in state)
         if (group.id == groupDmId)
@@ -157,20 +183,30 @@ class GroupDmNotifier extends Notifier<List<GroupDM>> {
         else
           group,
     ];
-
-    await ref.read(chatStorageProvider).appendMessage(groupDmId, messageText);
   }
 
-  Future<void> _flushOfflineQueue() async {
-    if (_offlineQueue.isEmpty) return;
+  void _replacePending(String groupDmId, String messageText) {
+    final pending = _pendingLabel(messageText);
+    state = [
+      for (final group in state)
+        if (group.id == groupDmId)
+          group.copyWith(
+            messages: _replaceFirst(group.messages, pending, messageText),
+          )
+        else
+          group,
+    ];
+  }
 
-    // Simulate sending queued messages
-    await Future<void>.delayed(const Duration(milliseconds: 500));
+  String _pendingLabel(String messageText) => '$messageText (Pending...)';
 
-    // Just clear the queue for the mock and assume they were sent
-    // We already appended "Pending..." so let's clean them up
-    // In a real app we'd replace the pending messages with real ones
-    _offlineQueue.clear();
+  List<String> _replaceFirst(List<String> messages, String from, String to) {
+    final index = messages.indexOf(from);
+    if (index == -1) return messages;
+    return [
+      for (var i = 0; i < messages.length; i++)
+        if (i == index) to else messages[i],
+    ];
   }
 
   void renameGroupDm(String groupId, String newName) {

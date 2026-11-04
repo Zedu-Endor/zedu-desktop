@@ -103,6 +103,75 @@ void main() {
       return container;
     }
 
+    test(
+      'renaming the organisation renames its workspace (Ziki #2388)',
+      () async {
+        when(() => storage.readData(any())).thenAnswer((_) async => null);
+        const renamed = OrganizationProfile(
+          id: 'A',
+          name: 'Renamed',
+          natureOfBusiness: 'Technology',
+          country: 'Nigeria',
+        );
+        when(
+          () => repo.updateOrganization(renamed, orgId: 'A'),
+        ).thenAnswer((_) async => const Success(renamed));
+
+        final container = ProviderContainer(
+          overrides: [
+            userProfileRepositoryProvider.overrideWithValue(repo),
+            workspaceProvider.overrideWith(() => _ListedWorkspaceNotifier('A')),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.listen(userProfileNotifierProvider, (_, _) {});
+        await settle();
+
+        await container
+            .read(userProfileNotifierProvider.notifier)
+            .updateOrganization(renamed);
+
+        final workspaces = container.read(workspaceProvider);
+        expect(workspaces.selectedWorkspace?.name, 'Renamed');
+        expect(workspaces.workspaces.map((w) => w.name), [
+          'Renamed',
+          'Workspace B',
+        ]);
+      },
+    );
+
+    test('a failed rename leaves the workspace name alone', () async {
+      when(() => storage.readData(any())).thenAnswer((_) async => null);
+      const renamed = OrganizationProfile(
+        id: 'A',
+        name: 'Renamed',
+        natureOfBusiness: 'Technology',
+        country: 'Nigeria',
+      );
+      when(
+        () => repo.updateOrganization(renamed, orgId: 'A'),
+      ).thenAnswer((_) => _failed());
+
+      final container = ProviderContainer(
+        overrides: [
+          userProfileRepositoryProvider.overrideWithValue(repo),
+          workspaceProvider.overrideWith(() => _ListedWorkspaceNotifier('A')),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(userProfileNotifierProvider, (_, _) {});
+      await settle();
+
+      await container
+          .read(userProfileNotifierProvider.notifier)
+          .updateOrganization(renamed);
+
+      expect(
+        container.read(workspaceProvider).selectedWorkspace?.name,
+        'Workspace A',
+      );
+    });
+
     test('drops an older load for the same workspace after A, B, A', () async {
       // The first load (workspace A) is held up in secure storage.
       final slowRead = Completer<String?>();
@@ -144,6 +213,82 @@ void main() {
       final state = container.read(userProfileNotifierProvider);
       expect(state.organization?.name, 'load 1');
       expect(state.isLoading, isFalse);
+    });
+
+    group('updateOrganization', () {
+      const saved = OrganizationProfile(
+        id: 'A',
+        name: 'saved',
+        natureOfBusiness: 'Technology',
+        country: 'Nigeria',
+      );
+
+      late Completer<Result<OrganizationProfile>> save;
+
+      setUp(() {
+        registerFallbackValue(saved);
+        save = Completer<Result<OrganizationProfile>>();
+        when(() => storage.readData(any())).thenAnswer((_) async => null);
+        when(
+          () => repo.updateOrganization(any(), orgId: any(named: 'orgId')),
+        ).thenAnswer((_) => save.future);
+      });
+
+      Future<ProviderContainer> startSaveInWorkspaceA() async {
+        final container = buildContainer();
+        await settle();
+        unawaited(
+          container
+              .read(userProfileNotifierProvider.notifier)
+              .updateOrganization(saved),
+        );
+        return container;
+      }
+
+      test('drops a response that arrives after a workspace switch', () async {
+        final container = await startSaveInWorkspaceA();
+        (container.read(workspaceProvider.notifier) as _TestWorkspaceNotifier)
+            .select('B');
+        await settle();
+
+        save.complete(const Success<OrganizationProfile>(saved));
+        await settle();
+
+        final state = container.read(userProfileNotifierProvider);
+        expect(state.organization?.id, 'B');
+        expect(state.organization?.name, 'load 2');
+        expect(state.isSaving, isFalse);
+        expect(state.successMessage, isNull);
+      });
+
+      test('drops a failure that arrives after a workspace switch', () async {
+        final container = await startSaveInWorkspaceA();
+        (container.read(workspaceProvider.notifier) as _TestWorkspaceNotifier)
+            .select('B');
+        await settle();
+        final errorBefore = container.read(userProfileNotifierProvider).error;
+
+        save.complete(
+          Failure<OrganizationProfile>(const ApiFailure(message: 'nope')),
+        );
+        await settle();
+
+        final state = container.read(userProfileNotifierProvider);
+        expect(state.isSaving, isFalse);
+        expect(state.error, errorBefore);
+      });
+
+      test('applies a response for the workspace still selected', () async {
+        final container = await startSaveInWorkspaceA();
+
+        save.complete(const Success<OrganizationProfile>(saved));
+        await settle();
+
+        final state = container.read(userProfileNotifierProvider);
+        expect(state.organization?.name, 'saved');
+        expect(state.isSaving, isFalse);
+        expect(state.successMessage, isNotNull);
+      });
     });
   });
 

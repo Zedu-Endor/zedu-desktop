@@ -21,6 +21,20 @@ class ThreadPanel extends StatefulWidget {
 
 class _ThreadPanelState extends State<ThreadPanel> {
   final List<String> _replies = [];
+  final TextEditingController _replyController = TextEditingController();
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  void _submitReply() {
+    final reply = _replyController.text.trim();
+    if (reply.isEmpty) return;
+    setState(() => _replies.add(reply));
+    _replyController.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +118,7 @@ class _ThreadPanelState extends State<ThreadPanel> {
               border: Border(top: BorderSide(color: colors.divider)),
             ),
             child: TextField(
+              controller: _replyController,
               decoration: InputDecoration(
                 hintText: 'Reply...',
                 hintStyle: TextStyle(color: colors.textHint),
@@ -123,13 +138,13 @@ class _ThreadPanelState extends State<ThreadPanel> {
                   horizontal: 12,
                   vertical: 12,
                 ),
-                suffixIcon: Icon(Icons.send, color: colors.primary),
+                suffixIcon: IconButton(
+                  tooltip: 'Send reply',
+                  onPressed: _submitReply,
+                  icon: Icon(Icons.send, color: colors.primary),
+                ),
               ),
-              onSubmitted: (value) {
-                if (value.trim().isNotEmpty) {
-                  setState(() => _replies.add(value.trim()));
-                }
-              },
+              onSubmitted: (_) => _submitReply(),
             ),
           ),
         ],

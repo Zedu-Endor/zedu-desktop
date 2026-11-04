@@ -16,8 +16,10 @@ class UserStatus {
   /// true = Active (green dot), false = Away (grey dot).
   final bool online;
 
+  /// Whether there is a status to show. One whose "Clear after" time has
+  /// passed doesn't count, even before it is cleared.
   bool get hasCustomStatus =>
-      emoji != null || (text != null && text!.isNotEmpty);
+      !isExpired && (emoji != null || (text != null && text!.isNotEmpty));
 
   bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
 
@@ -69,8 +71,8 @@ enum StatusTimeout {
   };
 
   /// When a status set at [now] with this timeout expires, or null when it
-  /// never does. "Today" and "This week" end at 23:59 on the last day of the
-  /// period; the week ends on Sunday.
+  /// never does. "Today" ends at 23:59. "This week" ends at 23:59:59 on the
+  /// coming Sunday; set on a Sunday, it runs to the next Sunday.
   DateTime? expiryFrom(DateTime now) => switch (this) {
     StatusTimeout.thirtyMinutes => now.add(const Duration(minutes: 30)),
     StatusTimeout.oneHour => now.add(const Duration(hours: 1)),
@@ -78,10 +80,14 @@ enum StatusTimeout {
     StatusTimeout.thisWeek => DateTime(
       now.year,
       now.month,
-      now.day + (DateTime.sunday - now.weekday),
+      now.day + _daysUntilEndOfWeek(now.weekday),
       23,
+      59,
       59,
     ),
     StatusTimeout.dontRemove => null,
   };
+
+  static int _daysUntilEndOfWeek(int weekday) =>
+      weekday == DateTime.sunday ? 7 : DateTime.sunday - weekday;
 }

@@ -13,8 +13,12 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
 
+  late final _signUpLink = TapGestureRecognizer()
+    ..onTap = () => context.push(AppRouter.signup);
+
   @override
   void dispose() {
+    _signUpLink.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -117,8 +121,7 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
                           style: context.textTheme.bodyMedium?.copyWith(
                             color: context.colors.primary,
                           ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () => context.push(AppRouter.signup),
+                          recognizer: _signUpLink,
                         ),
                       ],
                     ),

@@ -97,9 +97,13 @@ class ChannelMessageTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                SelectableText(
-                  message.text,
-                  style: TextStyle(fontSize: 15, color: colors.textPrimary),
+                MessageLinkScope(
+                  builder: (context, links) => SelectableText.rich(
+                    links.span(
+                      message.text,
+                      TextStyle(fontSize: 15, color: colors.textPrimary),
+                    ),
+                  ),
                 ),
               ],
             ),

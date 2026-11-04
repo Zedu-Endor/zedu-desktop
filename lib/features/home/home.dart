@@ -1,3 +1,4 @@
+export 'data/data.dart';
 export 'presentation/providers/active_chat_provider.dart';
 export 'presentation/providers/group_dm_provider.dart';
 export 'presentation/views/new_group_chat_view.dart';

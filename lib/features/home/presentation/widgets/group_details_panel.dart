@@ -78,6 +78,7 @@ class _GroupDetailsPanelState extends State<GroupDetailsPanel> {
                   onPressed: widget.onClose,
                   icon: Icon(Icons.close, color: colors.textHint),
                   splashRadius: 20,
+                  tooltip: 'Close group details',
                 ),
               ],
             ),
@@ -105,6 +106,7 @@ class _GroupDetailsPanelState extends State<GroupDetailsPanel> {
                       IconButton(
                         icon: Icon(Icons.check, color: colors.primary),
                         onPressed: _saveName,
+                        tooltip: 'Save group name',
                       ),
                     ],
                   )
@@ -128,6 +130,7 @@ class _GroupDetailsPanelState extends State<GroupDetailsPanel> {
                           color: colors.textHint,
                         ),
                         onPressed: () => setState(() => _isEditingName = true),
+                        tooltip: 'Edit group name',
                       ),
                     ],
                   ),

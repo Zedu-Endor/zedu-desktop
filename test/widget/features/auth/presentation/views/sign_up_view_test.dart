@@ -19,6 +19,13 @@ class FakeAuthNotifier extends AuthNotifier {
   final void Function(String, String, String)? _onSignUp;
   final Future<void>? _pendingSignUp;
   int signUpCalls = 0;
+  int googleCalls = 0;
+
+  @override
+  Future<void> loginWithGoogle() async {
+    googleCalls++;
+    state = AuthState(status: AuthStatus.authenticated);
+  }
 
   @override
   AuthState build() => const AuthState(status: AuthStatus.unauthenticated);
@@ -97,7 +104,7 @@ void main() {
 
       expect(
         find.textContaining(
-          'By signing up, you agree to our terms of service',
+          'By signing up, you agree to our Terms of Service and Privacy Policy',
           findRichText: true,
         ),
         findsOneWidget,
@@ -160,6 +167,22 @@ void main() {
       expect(find.text('HOME-STUB'), findsNothing);
       expect(find.text('Sign up failed'), findsOneWidget);
       expect(createAccountButton, findsOneWidget);
+      await drainToastTimer(tester);
+    });
+
+    testWidgets('"Sign up with Google" starts the Google flow', (tester) async {
+      final notifier = FakeAuthNotifier();
+      await pumpDesktopSignUp(tester, notifier);
+
+      final google = find.text('Sign up with Google');
+      await tester.ensureVisible(google);
+      await tester.tap(google);
+      await tester.pumpAndSettle();
+
+      expect(notifier.googleCalls, 1);
+      expect(find.text('Google sign up is not available yet.'), findsNothing);
+      // The Google account is signed in, so the user lands on home.
+      expect(find.text('HOME-STUB'), findsOneWidget);
       await drainToastTimer(tester);
     });
   });

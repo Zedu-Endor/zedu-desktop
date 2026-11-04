@@ -276,4 +276,41 @@ void main() {
       },
     );
   });
+
+  group('UserMenuDialog layout', () {
+    Future<void> pumpAt(WidgetTester tester, Size size) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpOpenMenu(
+        tester,
+        FakeAuthNotifier(
+          initial: AuthState(
+            status: AuthStatus.authenticated,
+            user: _buildUser(),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('keeps a bounded card width beside the rail', (tester) async {
+      await pumpAt(tester, const Size(1280, 720));
+
+      final card = tester.getRect(find.byKey(const ValueKey('user_menu_card')));
+      expect(card.width, 288);
+      expect(card.left, AppSidebarRail.width + 8);
+      expect(card.right, lessThan(1280));
+      expect(card.bottom, lessThanOrEqualTo(720 - 24));
+    });
+
+    testWidgets('shrinks the card instead of overhanging a narrow window', (
+      tester,
+    ) async {
+      await pumpAt(tester, const Size(320, 720));
+
+      final card = tester.getRect(find.byKey(const ValueKey('user_menu_card')));
+      expect(card.width, 320 - AppSidebarRail.width - 8 - 16);
+      expect(card.right, lessThanOrEqualTo(320 - 16));
+    });
+  });
 }

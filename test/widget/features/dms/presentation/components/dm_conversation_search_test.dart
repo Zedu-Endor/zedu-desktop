@@ -45,6 +45,8 @@ Future<void> _openSearch(WidgetTester tester) async {
   when(() => history.messages).thenReturn(_messages);
   when(() => history.isLoading).thenReturn(false);
   when(() => history.hasMore).thenReturn(false);
+  when(() => history.loadFailed).thenReturn(false);
+  when(() => history.loadMoreFailed).thenReturn(false);
   when(() => history.currentUserName).thenReturn('Me');
   when(() => history.isMyMessage(any())).thenAnswer(
     (call) => (call.positionalArguments.first as Map)['mine'] == true,

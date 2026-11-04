@@ -129,6 +129,9 @@ class _MainSidebarSwitcher extends ConsumerWidget {
     if (state == HomeSidebarType.dms) {
       return const DmSidebarList();
     }
+    if (state == HomeSidebarType.people) {
+      return const PeopleSidebar();
+    }
     if (state == HomeSidebarType.files) {
       return const FilesSidebar();
     }
@@ -145,23 +148,28 @@ class _ChatAreaSwitcher extends ConsumerWidget {
     final selectedDm = ref.watch(selectedDmProvider);
     final activeChat = ref.watch(activeChatProvider);
 
-    void leaveNewGroupChat() {
-      if (ref.read(activeChatProvider).type == ActiveChatType.newGroupChat) {
+    void leaveFullPage() {
+      final type = ref.read(activeChatProvider).type;
+      if (type == ActiveChatType.newGroupChat ||
+          type == ActiveChatType.channelDirectory) {
         ref.read(activeChatProvider.notifier).selectChannel('general');
       }
     }
 
-    // Close the New Group Chat page when the user switches sidebar tab or
-    // opens a conversation.
+    // Close the New Group Chat and Channel Directory pages when the user
+    // switches sidebar tab or opens a conversation.
     ref.listen(homeSidebarProvider, (previous, next) {
-      if (previous != next) leaveNewGroupChat();
+      if (previous != next) leaveFullPage();
     });
     ref.listen(selectedDmProvider, (previous, next) {
-      if (next != null) leaveNewGroupChat();
+      if (next != null) leaveFullPage();
     });
 
     if (activeChat.type == ActiveChatType.newGroupChat) {
       return const NewGroupChatView();
+    }
+    if (activeChat.type == ActiveChatType.channelDirectory) {
+      return const ChannelDirectoryView();
     }
 
     if (state == HomeSidebarType.dms) {
@@ -170,6 +178,9 @@ class _ChatAreaSwitcher extends ConsumerWidget {
       } else {
         return const DmEmptyState();
       }
+    }
+    if (state == HomeSidebarType.people) {
+      return const PeopleView();
     }
     if (state == HomeSidebarType.files) {
       return const FilesView();
@@ -211,32 +222,44 @@ class _MainSidebar extends ConsumerWidget {
           const SidebarChannelList(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border.all(
+            child: Material(
+              color: colors.onPrimary.withValues(alpha: 0.05),
+              shape: RoundedRectangleBorder(
+                side: BorderSide(
                   color: colors.onPrimary.withValues(alpha: 0.24),
                 ),
                 borderRadius: BorderRadius.circular(6),
-                color: colors.onPrimary.withValues(alpha: 0.05),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'View all channels',
-                      style: TextStyle(
-                        color: colors.onPrimary.withValues(alpha: 0.7),
-                        fontSize: 13,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                hoverColor: colors.onPrimary.withValues(alpha: 0.1),
+                onTap: () => ref
+                    .read(activeChatProvider.notifier)
+                    .selectChannelDirectory(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'View all channels',
+                          style: TextStyle(
+                            color: colors.onPrimary.withValues(alpha: 0.7),
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
-                    ),
+                      Icon(
+                        Icons.chevron_right,
+                        color: colors.onPrimary.withValues(alpha: 0.7),
+                        size: 16,
+                      ),
+                    ],
                   ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: colors.onPrimary.withValues(alpha: 0.7),
-                    size: 16,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

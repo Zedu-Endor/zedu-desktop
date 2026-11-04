@@ -39,10 +39,16 @@ String _canonicalCountryName(String value) {
   );
 }
 
+/// Saves the edited profile and returns an error message, or null when the
+/// save succeeded.
+typedef EditProfileSave = Future<String?> Function(ProfileAccount account);
+
+/// Opens the editor. It stays open while [onSave] runs and closes only when
+/// the save succeeds; on failure it keeps the draft and shows the error.
 Future<void> showEditProfileDialog(
   BuildContext context,
   ProfileAccount account,
-  ValueChanged<ProfileAccount> onSave,
+  EditProfileSave onSave,
 ) async {
   await showDialog<void>(
     context: context,
@@ -54,7 +60,7 @@ class _EditProfileDialog extends StatefulWidget {
   const _EditProfileDialog({required this.account, required this.onSave});
 
   final ProfileAccount account;
-  final ValueChanged<ProfileAccount> onSave;
+  final EditProfileSave onSave;
 
   @override
   State<_EditProfileDialog> createState() => _EditProfileDialogState();
@@ -73,6 +79,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
   late String selectedTimezone;
   late String selectedCountry;
+
+  bool _saving = false;
+  String? _saveError;
 
   @override
   void initState() {
@@ -103,6 +112,37 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     titleCtrl.dispose();
     pronunciationCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving || !(formKey.currentState?.validate() ?? false)) return;
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    final error = await widget.onSave(
+      widget.account.copyWith(
+        name: nameCtrl.text.trim(),
+        displayName: displayNameCtrl.text.trim(),
+        username: usernameCtrl.text.trim(),
+        email: emailCtrl.text.trim(),
+        phoneNumber: phoneCtrl.text.trim(),
+        title: titleCtrl.text.trim(),
+        namePronunciation: pronunciationCtrl.text.trim(),
+        timezone: selectedTimezone,
+        country: _canonicalCountryName(selectedCountry),
+      ),
+    );
+    // Closed with Cancel while saving: nothing left to update or pop.
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      _saving = false;
+      _saveError = error;
+    });
   }
 
   @override
@@ -488,6 +528,15 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  if (_saveError != null)
+                    Expanded(
+                      child: Text(
+                        _saveError!,
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: colors.error,
+                        ),
+                      ),
+                    ),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: Text(
@@ -500,24 +549,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                     label: 'Save changes',
                     expand: false,
                     height: 40,
-                    onPressed: () {
-                      if (formKey.currentState?.validate() ?? false) {
-                        widget.onSave(
-                          widget.account.copyWith(
-                            name: nameCtrl.text.trim(),
-                            displayName: displayNameCtrl.text.trim(),
-                            username: usernameCtrl.text.trim(),
-                            email: emailCtrl.text.trim(),
-                            phoneNumber: phoneCtrl.text.trim(),
-                            title: titleCtrl.text.trim(),
-                            namePronunciation: pronunciationCtrl.text.trim(),
-                            timezone: selectedTimezone,
-                            country: _canonicalCountryName(selectedCountry),
-                          ),
-                        );
-                        Navigator.pop(context);
-                      }
-                    },
+                    loading: _saving,
+                    onPressed: _saving ? null : _save,
                   ),
                 ],
               ),
