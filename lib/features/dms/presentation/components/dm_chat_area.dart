@@ -74,23 +74,9 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       case 'view_profile':
         await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: Text(conversation.displayName),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (conversation.participantEmail?.isNotEmpty == true)
-                  Text(conversation.participantEmail!),
-                Text('User ID: ${conversation.participantId}'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
+          builder: (context) => _ParticipantProfileDialog(
+            conversation: conversation,
+            handle: _recipientHandle,
           ),
         );
       case 'mute_notifications':
@@ -489,6 +475,101 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The other person's profile, opened from the header's "View profile".
+class _ParticipantProfileDialog extends StatelessWidget {
+  final DmConversation conversation;
+  final String handle;
+
+  const _ParticipantProfileDialog({
+    required this.conversation,
+    required this.handle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final textTheme = context.textTheme;
+    final name = conversation.displayName.trim();
+    final avatarUrl = conversation.effectiveAvatarUrl;
+    final email = conversation.participantEmail?.trim() ?? '';
+
+    return Dialog(
+      backgroundColor: colors.background,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SizedBox(
+        width: 360,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 36,
+                backgroundColor: colors.primary,
+                backgroundImage: avatarUrl != null
+                    ? NetworkImage(avatarUrl)
+                    : null,
+                child: avatarUrl == null
+                    ? Text(
+                        name.isEmpty ? '?' : name[0].toUpperCase(),
+                        style: textTheme.headlineSmall?.copyWith(
+                          color: colors.onPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                conversation.displayName,
+                textAlign: TextAlign.center,
+                style: textTheme.titleMedium?.copyWith(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                handle,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colors.textSecondary,
+                ),
+              ),
+              if (email.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Divider(height: 1, color: colors.divider),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.mail_outline, size: 18, color: colors.textHint),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SelectableText(
+                        email,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

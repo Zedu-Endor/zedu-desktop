@@ -12,45 +12,65 @@ class FakeAuthNotifier extends AuthNotifier {
   AuthState build() => const AuthState(status: AuthStatus.unauthenticated);
 }
 
-void main() {
-  testWidgets('DM menu uses a white surface and opens the selected action', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1280, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+Future<void> _pumpChatArea(
+  WidgetTester tester, {
+  String? participantEmail,
+}) async {
+  tester.view.physicalSize = const Size(1280, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 
-    final history = MockChatHistory();
-    when(() => history.messages).thenReturn([]);
-    when(() => history.isLoading).thenReturn(false);
-    when(() => history.hasMore).thenReturn(false);
-    final drafts = MockDraftStore();
-    when(() => drafts.load(any())).thenAnswer((_) async => null);
+  final history = MockChatHistory();
+  when(() => history.messages).thenReturn([]);
+  when(() => history.isLoading).thenReturn(false);
+  when(() => history.hasMore).thenReturn(false);
+  final drafts = MockDraftStore();
+  when(() => drafts.load(any())).thenAnswer((_) async => null);
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authNotifierProvider.overrideWith(FakeAuthNotifier.new),
-          chatHistoryProvider('chat-1').overrideWith((ref) => history),
-          dmDraftStoreProvider.overrideWith((ref) => drafts),
-        ],
-        child: buildTestMaterialApp(
-          Scaffold(
-            body: DmChatArea(
-              conversation: DmConversation(
-                channelId: 'chat-1',
-                username: 'Menu Tester',
-                participantId: 'user-1',
-                previewMessage: '',
-                unreadCount: 0,
-              ),
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+        chatHistoryProvider('chat-1').overrideWith((ref) => history),
+        dmDraftStoreProvider.overrideWith((ref) => drafts),
+      ],
+      child: buildTestMaterialApp(
+        Scaffold(
+          body: DmChatArea(
+            conversation: DmConversation(
+              channelId: 'chat-1',
+              username: 'Menu Tester',
+              participantId: 'user-1',
+              participantEmail: participantEmail,
+              previewMessage: '',
+              unreadCount: 0,
             ),
           ),
         ),
       ),
-    );
-    await tester.pumpAndSettle();
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openViewProfile(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('More options'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('View profile'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('DM menu uses a white surface and opens the selected action', (
+    tester,
+  ) async {
+    await _pumpChatArea(tester);
     await tester.tap(find.byTooltip('More options'));
     await tester.pumpAndSettle();
 
@@ -73,9 +93,55 @@ void main() {
 
     await tester.tap(find.text('View profile'));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('User ID: user-1'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsOneWidget);
+    await _unmount(tester);
+  });
+
+  group('View profile', () {
+    testWidgets('shows the person without their internal user id', (
+      tester,
+    ) async {
+      await _pumpChatArea(tester);
+      await _openViewProfile(tester);
+
+      final dialog = find.byType(Dialog);
+      expect(
+        find.descendant(of: dialog, matching: find.text('Menu Tester')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('@Menu_Tester')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('M')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('user-1'), findsNothing);
+      expect(find.textContaining('User ID'), findsNothing);
+      await _unmount(tester);
+    });
+
+    testWidgets('shows the email when the conversation has one', (
+      tester,
+    ) async {
+      await _pumpChatArea(tester, participantEmail: 'menu@zedu.chat');
+      await _openViewProfile(tester);
+
+      expect(find.text('menu@zedu.chat'), findsOneWidget);
+      expect(find.byIcon(Icons.mail_outline), findsOneWidget);
+      await _unmount(tester);
+    });
+
+    testWidgets('closes with the Close button', (tester) async {
+      await _pumpChatArea(tester);
+      await _openViewProfile(tester);
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsNothing);
+      await _unmount(tester);
+    });
   });
 }
