@@ -60,14 +60,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
     final authState = ref.watch(authNotifierProvider);
 
     // Format the email to mask it like pl***@gmail.com
-    String maskedEmail = widget.email;
-    if (maskedEmail.contains('@')) {
-      final parts = maskedEmail.split('@');
-      final local = parts[0];
-      if (local.length > 2) {
-        maskedEmail = '${local.substring(0, 2)}***@${parts[1]}';
-      }
-    }
+    final maskedEmail = maskEmail(widget.email);
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -117,7 +110,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
               children: [
                 context.gapV(80),
                 Text(
-                  'Change Password',
+                  'Change password',
                   style: context.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -173,6 +166,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
                         label: 'Confirm new password',
                         hint: 'Confirm new Password',
                         textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _onChangePasswordPressed(),
                         validator: (value) {
                           if (value != _newPasswordController.text) {
                             return 'Passwords do not match';
@@ -182,7 +176,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
                       ),
                       context.gapV(32),
                       AppButton(
-                        label: 'Change Password',
+                        label: 'Change password',
                         loading: authState.isLoading,
                         onPressed: _onChangePasswordPressed,
                       ),

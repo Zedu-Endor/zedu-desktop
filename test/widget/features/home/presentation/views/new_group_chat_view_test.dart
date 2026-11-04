@@ -242,4 +242,76 @@ void main() {
       expect(find.text('Loading people and channels…'), findsOneWidget);
     });
   });
+
+  group('NewGroupChatView member names', () {
+    const emptyNameMembers = [
+      TeamMember(
+        id: 'member-1',
+        name: '',
+        email: 'emptyname@zedu.test',
+        role: 'Member',
+        dateJoined: 'Jan 1, 2026',
+        status: TeamMemberStatus.active,
+      ),
+      TeamMember(
+        id: 'member-2',
+        name: '   ',
+        email: 'whitespace@zedu.test',
+        role: 'Member',
+        dateJoined: 'Jan 1, 2026',
+        status: TeamMemberStatus.active,
+      ),
+      TeamMember(
+        id: 'member-3',
+        name: null,
+        email: 'nullname@zedu.test',
+        role: 'Member',
+        dateJoined: 'Jan 1, 2026',
+        status: TeamMemberStatus.active,
+      ),
+      TeamMember(
+        id: 'member-4',
+        name: 'Alice Cooper',
+        email: 'alice@zedu.test',
+        role: 'Admin',
+        dateJoined: 'Jan 1, 2026',
+        status: TeamMemberStatus.active,
+      ),
+    ];
+
+    testWidgets(
+      'renders contact list without crashing when members have empty or whitespace names',
+      (tester) async {
+        await pumpView(tester, members: emptyNameMembers);
+
+        expect(find.text('emptyname'), findsOneWidget);
+        expect(find.text('whitespace'), findsOneWidget);
+        expect(find.text('nullname'), findsOneWidget);
+        expect(find.text('Alice Cooper'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'renders selected member chip with safe initials and fallback label for empty name',
+      (tester) async {
+        await pumpView(tester, members: emptyNameMembers);
+
+        await tester.tap(find.text('emptyname'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(Chip), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(Chip),
+            matching: find.text('emptyname'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: find.byType(Chip), matching: find.text('EM')),
+          findsOneWidget,
+        );
+      },
+    );
+  });
 }
