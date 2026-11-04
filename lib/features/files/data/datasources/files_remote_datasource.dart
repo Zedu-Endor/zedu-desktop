@@ -23,6 +23,9 @@ abstract class FilesRemoteDataSource {
   /// Deletes file [fileId]: moves it to Deleted files, or removes it for good
   /// when [permanent].
   Future<void> deleteFile(String fileId, {bool permanent = false});
+
+  /// Renames file [fileId] to [name].
+  Future<void> renameFile(String fileId, String name);
 }
 
 /// Talks to the same `/files` endpoints as the web app. The server picks
@@ -121,6 +124,14 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
     await apiBaseService.delete<dynamic>(
       path: '/files/file/$fileId',
       queryParameters: permanent ? const {'permanent': true} : null,
+    );
+  }
+
+  @override
+  Future<void> renameFile(String fileId, String name) async {
+    await apiBaseService.put<dynamic>(
+      path: '/files/file/$fileId',
+      data: {'file_name': name},
     );
   }
 }

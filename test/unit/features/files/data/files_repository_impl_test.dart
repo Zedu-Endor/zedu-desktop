@@ -176,4 +176,34 @@ void main() {
       );
     });
   });
+
+  group('renameFile', () {
+    test('passes the request on and succeeds', () async {
+      when(
+        () => remote.renameFile('f-1', 'brand.png'),
+      ).thenAnswer((_) async {});
+
+      expect(
+        await repository.renameFile('f-1', 'brand.png'),
+        isA<Success<void>>(),
+      );
+    });
+
+    test('returns the failure when the server refuses', () async {
+      when(() => remote.renameFile('f-1', 'brand.png')).thenThrow(
+        const ApiFailure(message: 'Name taken', kind: ApiFailureKind.client),
+      );
+
+      final result = await repository.renameFile('f-1', 'brand.png');
+
+      expect(
+        result,
+        isA<Failure<void>>().having(
+          (f) => f.error.message,
+          'message',
+          'Name taken',
+        ),
+      );
+    });
+  });
 }

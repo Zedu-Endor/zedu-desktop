@@ -39,6 +39,15 @@ class _FakeFilesRepository implements FilesRepository {
   final folderRequests = <(FilesScope, String?)>[];
   final downloads = <(String, String)>[];
   final deletes = <(String, bool)>[];
+  final renames = <(String, String)>[];
+  Result<void> renameResult = const Success(null);
+
+  @override
+  Future<Result<void>> renameFile(String fileId, String name) async {
+    renames.add((fileId, name));
+    return renameResult;
+  }
+
   Result<void> deleteResult = const Success(null);
 
   @override
@@ -403,5 +412,98 @@ void main() {
     expect(find.text('Deleted logo.png permanently.'), findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
+  });
+
+  Finder renameField() => find.descendant(
+    of: find.byType(RenameFileDialog),
+    matching: find.byType(TextField),
+  );
+
+  testWidgets('renames a file', (tester) async {
+    final repository = _FakeFilesRepository();
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+    final loads = repository.queries.length;
+
+    await chooseInMenu(tester, 'Rename');
+    expect(find.text('Rename file'), findsOneWidget);
+    await tester.enterText(renameField(), 'brand.png');
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+    await tester.pumpAndSettle();
+
+    expect(repository.renames, [('f-1', 'brand.png')]);
+    expect(find.text('Rename file'), findsNothing);
+    expect(find.text('Renamed logo.png to brand.png.'), findsOneWidget);
+    expect(repository.queries.length, loads + 1);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('keeping the same name renames nothing', (tester) async {
+    final repository = _FakeFilesRepository();
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+
+    await chooseInMenu(tester, 'Rename');
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+    await tester.pumpAndSettle();
+
+    expect(repository.renames, isEmpty);
+    expect(find.text('Rename file'), findsNothing);
+  });
+
+  testWidgets('an empty name cannot be saved', (tester) async {
+    final repository = _FakeFilesRepository();
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+
+    await chooseInMenu(tester, 'Rename');
+    await tester.enterText(renameField(), '   ');
+    await tester.pump();
+
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Rename'),
+    );
+    expect(button.onPressed, isNull);
+  });
+
+  testWidgets('a failed rename keeps the dialog open with the reason', (
+    tester,
+  ) async {
+    final repository = _FakeFilesRepository()
+      ..renameResult = const Failure(
+        ApiFailure(
+          message: 'A file with this name already exists',
+          kind: ApiFailureKind.client,
+        ),
+      );
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+
+    await chooseInMenu(tester, 'Rename');
+    await tester.enterText(renameField(), 'brand.png');
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rename file'), findsOneWidget);
+    expect(
+      find.text(
+        'Could not rename logo.png. A file with this name already exists',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('logo.png'), findsOneWidget);
+  });
+
+  testWidgets('deleted files cannot be renamed', (tester) async {
+    await _pump(tester, _FakeFilesRepository());
+
+    await tester.tap(find.text('Deleted files'));
+    await tester.pumpAndSettle();
+    await openFilesTab(tester);
+    await tester.tap(actionsMenu());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rename'), findsNothing);
   });
 }

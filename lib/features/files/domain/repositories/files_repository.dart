@@ -22,4 +22,7 @@ abstract class FilesRepository {
   /// Deletes [fileId]: moves it to Deleted files, or removes it for good when
   /// [permanent].
   Future<Result<void>> deleteFile(String fileId, {bool permanent = false});
+
+  /// Renames [fileId] to [name].
+  Future<Result<void>> renameFile(String fileId, String name);
 }

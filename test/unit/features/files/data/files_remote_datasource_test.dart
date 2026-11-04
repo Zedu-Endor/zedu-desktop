@@ -281,4 +281,27 @@ void main() {
       ).called(1);
     });
   });
+
+  group('renameFile', () {
+    test('sends the new name', () async {
+      when(
+        () => api.put<dynamic>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const ApiResponseModel<dynamic>(statusCode: 200, data: null),
+      );
+
+      await datasource.renameFile('f-1', 'brand.png');
+
+      verify(
+        () => api.put<dynamic>(
+          path: '/files/file/f-1',
+          data: {'file_name': 'brand.png'},
+        ),
+      ).called(1);
+    });
+  });
 }

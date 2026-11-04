@@ -252,6 +252,17 @@ class _FilesSection extends ConsumerWidget {
     }
   }
 
+  Future<void> _rename(BuildContext context, WorkspaceFile file) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final newName = await RenameFileDialog.show(context, file: file);
+    if (newName == null || !overlay.mounted) return;
+    AppToastService.showWith(
+      overlay,
+      type: AppToastType.success,
+      message: 'Renamed ${file.name} to $newName.',
+    );
+  }
+
   Future<void> _delete(
     BuildContext context,
     WorkspaceFile file, {
@@ -316,6 +327,9 @@ class _FilesSection extends ConsumerWidget {
               onDownload: scope == FilesScope.trash
                   ? null
                   : (file) => _download(context, ref, file),
+              onRename: scope == FilesScope.trash
+                  ? null
+                  : (file) => _rename(context, file),
               onDelete: (file) =>
                   _delete(context, file, permanent: scope == FilesScope.trash),
               deletesPermanently: scope == FilesScope.trash,
