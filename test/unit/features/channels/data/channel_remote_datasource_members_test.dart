@@ -40,8 +40,21 @@ void main() {
           (_) async => ApiResponseModel<Map<String, dynamic>>(
             data: {
               'data': [
-                {'id': 'u1', 'username': 'ada', 'email': 'ada@zedu.chat'},
-                {'id': 'u2', 'username': '', 'email': 'blank@zedu.chat'},
+                {
+                  'id': 'u1',
+                  'email': 'ada@zedu.chat',
+                  'restricted': false,
+                  'profile': {
+                    'username': 'ada',
+                    'avatar_url': 'https://cdn.zedu.chat/ada.png',
+                  },
+                },
+                {
+                  'id': 'u2',
+                  'email': 'blank@zedu.chat',
+                  'profile': {'username': ''},
+                },
+                {'id': 'u3', 'email': 'no-profile@zedu.chat'},
               ],
             },
             statusCode: 200,
@@ -52,6 +65,7 @@ void main() {
 
         expect(members.map((m) => m.username), ['ada']);
         expect(members.single.userId, 'u1');
+        expect(members.single.avatarUrl, 'https://cdn.zedu.chat/ada.png');
       },
     );
 

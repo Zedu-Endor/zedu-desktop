@@ -66,7 +66,9 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
     final conversation = entry.conversation;
     if (conversation == null) {
       ref.read(homeSidebarProvider.notifier).setType(HomeSidebarType.home);
-      ref.read(activeChatProvider.notifier).selectChannel(entry.label);
+      ref
+          .read(activeChatProvider.notifier)
+          .selectChannel(entry.label, channelId: entry.channelId);
     } else {
       ref.read(homeSidebarProvider.notifier).setType(HomeSidebarType.dms);
       ref.read(selectedDmProvider.notifier).select(conversation);
@@ -137,7 +139,7 @@ class _QuickSwitcherLoaderState extends ConsumerState<_QuickSwitcherLoader> {
       entries: [
         ...?channels.value
             ?.where((c) => !c.archived)
-            .map((c) => QuickSwitcherEntry.channel(c.name)),
+            .map((c) => QuickSwitcherEntry.channel(c.name, channelId: c.id)),
         ...?dms.value?.map(QuickSwitcherEntry.dm),
       ],
       loading: channels.isLoading || dms.isLoading,

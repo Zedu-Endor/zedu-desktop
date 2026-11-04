@@ -7,12 +7,6 @@ class _FakeAuthNotifier extends AuthNotifier {
   AuthState build() => const AuthState(status: AuthStatus.authenticated);
 }
 
-/// The settings shell reads the selected workspace; skip the network load.
-class _FakeWorkspaceNotifier extends WorkspaceNotifier {
-  @override
-  WorkspaceState build() => const WorkspaceState();
-}
-
 class _FakeCreditsNotifier extends CreditsNotifier {
   @override
   CreditsState build() => const CreditsState();
@@ -27,6 +21,21 @@ class _FakeUserProfileNotifier extends UserProfileNotifier {
 }
 
 void main() {
+  setUp(() {
+    if (locator.isRegistered<AppConfig>()) {
+      locator.unregister<AppConfig>();
+    }
+    locator.registerSingleton<AppConfig>(
+      const AppConfig(apiBaseUrl: 'http://test', usesMockData: false),
+    );
+  });
+
+  tearDown(() {
+    if (locator.isRegistered<AppConfig>()) {
+      locator.unregister<AppConfig>();
+    }
+  });
+
   void mockVersion({String version = '1.2.3', String buildNumber = '45'}) {
     PackageInfo.setMockInitialValues(
       appName: 'zedu',
@@ -119,7 +128,6 @@ void main() {
         ProviderScope(
           overrides: [
             authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
-            workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
             creditsNotifierProvider.overrideWith(_FakeCreditsNotifier.new),
             userProfileNotifierProvider.overrideWith(
               _FakeUserProfileNotifier.new,

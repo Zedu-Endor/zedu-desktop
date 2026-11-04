@@ -59,6 +59,15 @@ class _FakeChannelNotifier extends ChannelNotifier {
   ];
 }
 
+class _CaseChannelNotifier extends ChannelNotifier {
+  @override
+  Future<List<Channel>> build() async => [
+    _channel('general'),
+    _channel('engineering'),
+    _channel('Engineering'),
+  ];
+}
+
 final _longName = List.filled(61, 'a').join();
 
 class _LongNameChannelNotifier extends ChannelNotifier {
@@ -144,6 +153,27 @@ void main() {
       expect(find.text('Welcome to #random'), findsOneWidget);
       expect(find.text('# general'), findsNothing);
     });
+
+    testWidgets(
+      'channels whose names differ only by case open their own channel',
+      (tester) async {
+        await pumpSidebarAndChat(tester, channels: _CaseChannelNotifier.new);
+
+        String composerChannelId() => tester
+            .widget<DmMessageComposer>(find.byType(DmMessageComposer))
+            .channelId;
+
+        await tester.tap(find.text('Engineering'));
+        await tester.pumpAndSettle();
+        expect(find.text('# Engineering'), findsOneWidget);
+        expect(composerChannelId(), 'channel-Engineering');
+
+        await tester.tap(find.text('engineering'));
+        await tester.pumpAndSettle();
+        expect(find.text('# engineering'), findsOneWidget);
+        expect(composerChannelId(), 'channel-engineering');
+      },
+    );
 
     testWidgets('goes back to #general when the workspace changes', (
       tester,

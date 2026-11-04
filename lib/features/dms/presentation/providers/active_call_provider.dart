@@ -73,8 +73,6 @@ class ActiveCallNotifier extends ChangeNotifier {
 
   @override
   void notifyListeners() {
-    // Two merged changes each overrode this; one guards against notifying
-    // after dispose, the other keeps the ringtone in step with the state.
     if (_disposed) return;
     _syncRingtone();
     super.notifyListeners();

@@ -150,12 +150,14 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     return [
       for (final member in members)
         if ((member['id'] as String? ?? '').isNotEmpty &&
-            (member['username'] as String? ?? '').isNotEmpty)
+            _memberField(member, 'username').isNotEmpty)
           DmParticipant(
             userId: member['id'] as String,
-            username: member['username'] as String,
+            username: _memberField(member, 'username'),
             email: member['email'] as String? ?? '',
-            avatarUrl: member['avatar_url'] as String?,
+            avatarUrl: _memberField(member, 'avatar_url').isEmpty
+                ? null
+                : _memberField(member, 'avatar_url'),
           ),
     ];
   }
@@ -184,6 +186,15 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(ChannelMessage.fromJson)
         .toList();
+  }
+
+  // The channel users route nests username and avatar_url under profile.
+  String _memberField(Map<String, dynamic> member, String field) {
+    final profile = member['profile'];
+    final nested = profile is Map<String, dynamic> ? profile[field] : null;
+    if (nested is String && nested.isNotEmpty) return nested;
+    final topLevel = member[field];
+    return topLevel is String ? topLevel : '';
   }
 
   Future<List<String>> _fetchAllMemberIds(String path) async {

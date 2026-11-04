@@ -165,7 +165,7 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
                       onTap: () {
                         ref
                             .read(activeChatProvider.notifier)
-                            .selectChannel(channel.name);
+                            .selectChannel(channel.name, channelId: channel.id);
                       },
                     );
                   },

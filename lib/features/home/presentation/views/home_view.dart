@@ -347,10 +347,25 @@ class HomeChatArea extends ConsumerWidget {
         ? (chat.id ?? 'general')
         : 'general';
     Channel? selected;
-    for (final item in channels) {
-      if (item.name.toLowerCase() == channelName.toLowerCase()) {
-        selected = item;
-        break;
+    // Two channels can differ only in letter case, so the picked id wins over
+    // the name. The name still finds #general at the start, before any pick.
+    final pickedId = chat.type == ActiveChatType.channel
+        ? chat.channelId
+        : null;
+    if (pickedId != null) {
+      for (final item in channels) {
+        if (item.id == pickedId) {
+          selected = item;
+          break;
+        }
+      }
+    }
+    if (selected == null) {
+      for (final item in channels) {
+        if (item.name.toLowerCase() == channelName.toLowerCase()) {
+          selected = item;
+          break;
+        }
       }
     }
 

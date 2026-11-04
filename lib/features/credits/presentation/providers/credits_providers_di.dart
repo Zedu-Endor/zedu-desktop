@@ -29,10 +29,16 @@ final creditsOrgIdProvider = Provider<String>((ref) {
 final orgCreditBalanceProvider = Provider<int>((ref) {
   final orgId = ref.watch(creditsOrgIdProvider);
   final creditsState = ref.watch(creditsNotifierProvider);
-  if (creditsState.orgId == orgId &&
-      (creditsState.status == CreditsStatus.ready ||
-          creditsState.status == CreditsStatus.purchasing ||
-          creditsState.status == CreditsStatus.verifying)) {
+  // An error with the packages already loaded is a failed purchase or
+  // payment check, not a failed load, so the balance loaded earlier is still
+  // the right one to show.
+  final usageIsLoaded =
+      creditsState.status == CreditsStatus.ready ||
+      creditsState.status == CreditsStatus.purchasing ||
+      creditsState.status == CreditsStatus.verifying ||
+      (creditsState.status == CreditsStatus.error &&
+          creditsState.packages.isNotEmpty);
+  if (creditsState.orgId == orgId && usageIsLoaded) {
     return creditsState.usage.balance;
   }
   // The sign-in response only carries the sign-in organisation's balance.

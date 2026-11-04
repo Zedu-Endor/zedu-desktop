@@ -13,7 +13,7 @@ Widget buildSecuritySection(List<SecuritySession> sessions) {
             ({
               required String currentPassword,
               required String newPassword,
-            }) async => const Success(null),
+            }) async => const Success<void>(null),
       ),
     ),
   );

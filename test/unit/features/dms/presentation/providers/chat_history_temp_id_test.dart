@@ -61,7 +61,6 @@ void main() {
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         ],
       );
-      // chatHistoryProvider is autoDispose: keep it alive while the test runs.
       notifier = container
           .listen(chatHistoryProvider('ch-1'), (_, _) {})
           .read();

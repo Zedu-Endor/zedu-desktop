@@ -143,9 +143,12 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
 
     final current = state.value ?? [];
     final version = _listVersion;
-    _currentPage++;
-    final next = await _fetchPage(orgId, _currentPage);
+    // Only count the page once it has loaded, so a failed load is asked for
+    // again on the next scroll instead of being skipped.
+    final page = _currentPage + 1;
+    final next = await _fetchPage(orgId, page);
     if (version != _listVersion) return;
+    _currentPage = page;
     state = AsyncValue.data([...current, ...next]);
   }
 

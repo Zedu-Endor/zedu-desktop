@@ -6,10 +6,16 @@ class QuickSwitcherEntry {
   final String label;
   final DmConversation? conversation;
 
-  const QuickSwitcherEntry.channel(this.label) : conversation = null;
+  /// The channel's id, so two channels whose names differ only in case open
+  /// the right one. Null for a DM.
+  final String? channelId;
+
+  const QuickSwitcherEntry.channel(this.label, {this.channelId})
+    : conversation = null;
 
   QuickSwitcherEntry.dm(DmConversation this.conversation)
-    : label = conversation.displayName;
+    : label = conversation.displayName,
+      channelId = null;
 
   bool get isChannel => conversation == null;
 }

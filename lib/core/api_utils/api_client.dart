@@ -140,8 +140,15 @@ class ApiBaseService {
         );
       }
 
+      if (responseData is! T) {
+        throw ApiFailure.fromParsingError(
+          'expected $T, got ${responseData.runtimeType}',
+          path: path,
+        );
+      }
+
       return ApiResponseModel<T>(
-        data: responseData as T,
+        data: responseData,
         statusCode: response.statusCode ?? 0,
         message: response.statusMessage,
       );

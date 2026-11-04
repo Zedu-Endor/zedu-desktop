@@ -173,7 +173,11 @@ void main() {
 
       expect(
         container.read(activeChatProvider),
-        const ActiveChatState(type: ActiveChatType.channel, id: 'random'),
+        const ActiveChatState(
+          type: ActiveChatType.channel,
+          id: 'random',
+          channelId: 'channel-random',
+        ),
       );
     });
   });

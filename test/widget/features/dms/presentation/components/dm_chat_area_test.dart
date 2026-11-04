@@ -533,18 +533,18 @@ void main() {
 
       expect(find.text('Tom & Jerry', findRichText: true), findsOneWidget);
       expect(find.textContaining('<p>', findRichText: true), findsNothing);
-      // Inline Markdown nests each formatted token, so search every span.
       final bold = find.byWidgetPredicate((widget) {
         if (widget is! RichText) return false;
-        var found = false;
+        var isBold = false;
         widget.text.visitChildren((span) {
-          found =
-              span is TextSpan &&
+          if (span is TextSpan &&
               span.text == 'Jerry' &&
-              span.style?.fontWeight == FontWeight.bold;
-          return !found;
+              span.style?.fontWeight == FontWeight.bold) {
+            isBold = true;
+          }
+          return true;
         });
-        return found;
+        return isBold;
       });
       expect(bold, findsOneWidget);
     });

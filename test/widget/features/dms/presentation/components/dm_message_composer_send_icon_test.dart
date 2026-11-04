@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -76,11 +75,10 @@ void main() {
   }
 
   Future<void> attachFile(WidgetTester tester) async {
-    // addFiles checks the file exists on disk, which is real I/O: it never
-    // completes under the test clock, so run it with runAsync on a real file.
+    // addFiles checks the file on disk, which needs real async in a widget test.
     await tester.runAsync(() async {
       final dir = await Directory.systemTemp.createTemp('send_icon_test');
-      addTearDown(() => dir.delete(recursive: true));
+      addTearDown(() => dir.deleteSync(recursive: true));
       final file = File('${dir.path}${Platform.pathSeparator}sample.txt');
       await file.writeAsBytes([1, 2, 3]);
       await composerKey.currentState!.addFiles([

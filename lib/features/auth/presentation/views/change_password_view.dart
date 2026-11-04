@@ -166,6 +166,7 @@ class _ChangePasswordViewState extends ConsumerState<ChangePasswordView> {
                         label: 'Confirm new password',
                         hint: 'Confirm new Password',
                         textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _onChangePasswordPressed(),
                         validator: (value) {
                           if (value != _newPasswordController.text) {
                             return 'Passwords do not match';
