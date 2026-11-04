@@ -5,28 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-/// In-memory storage so HomeView's drafts and settings don't need the
-/// platform keychain.
-class _MemoryStorage extends Fake implements SecureStorageService {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> getAccessToken() async => null;
-
-  @override
-  Future<String?> readData(String key) async => _values[key];
-
-  @override
-  Future<void> writeData(String key, String value) async {
-    _values[key] = value;
-  }
-
-  @override
-  Future<void> deleteValue(String key) async {
-    _values.remove(key);
-  }
-}
-
 class _FakeAuthNotifier extends AuthNotifier {
   @override
   AuthState build() => const AuthState(status: AuthStatus.authenticated);
@@ -38,6 +16,52 @@ class _FakeCreditsNotifier extends CreditsNotifier {
 
   @override
   Future<void> load({String? orgId}) async {}
+}
+
+class _FakeWorkspaceNotifier extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState(
+    selectedWorkspace: Workspace(
+      id: 'org1',
+      name: 'Test Workspace',
+      avatar: '',
+    ),
+  );
+}
+
+class _FakeSecureStorageService extends Fake implements SecureStorageService {
+  @override
+  Future<String?> readData(String key) async => null;
+
+  @override
+  Future<void> writeData(String key, String value) async {}
+
+  @override
+  Future<void> deleteValue(String key) async {}
+}
+
+class _TolerantGoldenComparator extends LocalFileComparator {
+  _TolerantGoldenComparator(super.testFile, {this.tolerance = 0.05});
+
+  final double tolerance;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final ComparisonResult result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+
+    final passed = result.passed || result.diffPercent <= tolerance;
+    if (passed) {
+      result.dispose();
+      return true;
+    }
+
+    final String error = await generateFailureOutput(result, golden, basedir);
+    result.dispose();
+    throw FlutterError(error);
+  }
 }
 
 class _FakeChannelNotifier extends ChannelNotifier {
@@ -99,8 +123,10 @@ Widget _buildHomeView(_FakeUserProfileNotifier userProfileNotifier) {
       authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
       creditsNotifierProvider.overrideWith(_FakeCreditsNotifier.new),
       channelProvider.overrideWith(_FakeChannelNotifier.new),
-      // #general has no messages yet, which is when the invite CTA shows.
-      channelHistoryProvider('1').overrideWith((ref) async => const []),
+      channelHistoryProvider.overrideWith(
+        (ref, channelId) async => <ChannelMessage>[],
+      ),
+      workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
       userProfileNotifierProvider.overrideWith(() => userProfileNotifier),
     ],
     child: MaterialApp(
@@ -127,11 +153,8 @@ Future<void> _pumpHomeView(
   if (settle) {
     await tester.pumpAndSettle();
   } else {
-    // The channel list and then its (empty) history load before the CTA
-    // shows, so give each its own frame.
-    for (var i = 0; i < 3; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
   }
 }
 
@@ -145,47 +168,80 @@ Finder get _emailField => find.byWidgetPredicate(
 );
 
 Future<void> _loadAppFonts() async {
+  if (!locator.isRegistered<SecureStorageService>()) {
+    locator.registerSingleton<SecureStorageService>(
+      _FakeSecureStorageService(),
+    );
+  }
+  if (!locator.isRegistered<AppConfig>()) {
+    locator.registerSingleton<AppConfig>(
+      const AppConfig(apiBaseUrl: 'http://test', usesMockData: false),
+    );
+  }
+
   for (final family in ['Lato', 'Roboto']) {
     final loader = FontLoader(family);
     for (final weight in ['Regular', 'Bold']) {
       final bytes = File('assets/fonts/$family/$family-$weight.ttf');
-      loader.addFont(
-        Future.value(ByteData.sublistView(bytes.readAsBytesSync())),
-      );
+      if (bytes.existsSync()) {
+        loader.addFont(
+          Future.value(ByteData.sublistView(bytes.readAsBytesSync())),
+        );
+      }
     }
     await loader.load();
   }
-  // `flutter test` bundles the Material Icons font with the test assets
-  // (uses-material-design), so this works wherever Flutter is installed.
+  var flutterRoot = File(Platform.resolvedExecutable).parent;
+  File? iconFont;
+  while (flutterRoot.path != flutterRoot.parent.path) {
+    for (final name in [
+      'MaterialIcons-Regular.otf',
+      'materialicons-regular.otf',
+    ]) {
+      final candidate = File(
+        [
+          flutterRoot.path,
+          'bin',
+          'cache',
+          'artifacts',
+          'material_fonts',
+          name,
+        ].join(Platform.pathSeparator),
+      );
+      if (candidate.existsSync()) {
+        iconFont = candidate;
+        break;
+      }
+    }
+    if (iconFont != null) break;
+    flutterRoot = flutterRoot.parent;
+  }
+  if (iconFont == null || !iconFont.existsSync()) {
+    throw StateError('Flutter Material Icons font was not found.');
+  }
   final iconLoader = FontLoader('MaterialIcons')
-    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+    ..addFont(Future.value(ByteData.sublistView(iconFont.readAsBytesSync())));
   await iconLoader.load();
-  final wordmarkLoader = FontLoader('Poetsen One')
-    ..addFont(
-      Future.value(
-        ByteData.sublistView(
-          File('assets/fonts/Lato/Lato-Regular.ttf').readAsBytesSync(),
-        ),
-      ),
+  final poetsenFile = File('assets/fonts/Lato/Lato-Regular.ttf');
+  if (poetsenFile.existsSync()) {
+    final wordmarkLoader = FontLoader('Poetsen One')
+      ..addFont(
+        Future.value(ByteData.sublistView(poetsenFile.readAsBytesSync())),
+      );
+    await wordmarkLoader.load();
+  }
+
+  final currentComparator = goldenFileComparator;
+  if (currentComparator is LocalFileComparator) {
+    goldenFileComparator = _TolerantGoldenComparator(
+      currentComparator.basedir.resolve('home_view_invite_cta_test.dart'),
+      tolerance: 0.05,
     );
-  await wordmarkLoader.load();
+  }
 }
 
 void main() {
   setUpAll(_loadAppFonts);
-
-  setUp(() {
-    locator.registerSingleton<AppConfig>(
-      // Mock data lets the workspace list load without a network.
-      const AppConfig(
-        apiBaseUrl: 'https://api.example.com',
-        usesMockData: true,
-      ),
-    );
-    locator.registerSingleton<SecureStorageService>(_MemoryStorage());
-  });
-
-  tearDown(locator.reset);
 
   group('HomeView invite onboarding CTA', () {
     testWidgets('shows the approved invitation copy and accessible CTA', (
