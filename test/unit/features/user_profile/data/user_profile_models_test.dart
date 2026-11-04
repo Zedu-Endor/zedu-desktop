@@ -71,6 +71,29 @@ void main() {
       expect(account.initials, 'AU');
       expect(account.avatarUrl, 'https://example.com/avatar.png');
     });
+
+    group('initials', () {
+      String initialsOf(String name) =>
+          ProfileAccountModel.fromJson({'name': name}).initials;
+
+      test('keep an emoji whole when a one-word name starts with it', () {
+        expect(initialsOf('🚀Dev'), '🚀');
+      });
+
+      test('keep emoji whole when a two-word name uses them', () {
+        expect(initialsOf('🌟 Ada 🚀Lovelace'), '🌟🚀');
+      });
+
+      test('keep a joined emoji whole', () {
+        expect(initialsOf('👨‍💻 Dev'), '👨‍💻D');
+      });
+
+      test('are unchanged for plain names', () {
+        expect(initialsOf('ada'), 'A');
+        expect(initialsOf('Ada Lovelace'), 'AL');
+        expect(initialsOf('   '), 'ZU');
+      });
+    });
   });
 
   group('OrganizationProfileModel', () {
