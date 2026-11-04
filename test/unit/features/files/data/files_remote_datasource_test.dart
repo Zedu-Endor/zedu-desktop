@@ -148,4 +148,27 @@ void main() {
       expect(await datasource.fetchFolders(view: FilesScope.all), isEmpty);
     });
   });
+
+  group('restoreFile', () {
+    test('sends PUT to the restore path of that file', () async {
+      when(() => api.put<dynamic>(path: any(named: 'path'))).thenAnswer(
+        (_) async =>
+            const ApiResponseModel<dynamic>(statusCode: 200, data: null),
+      );
+
+      await datasource.restoreFile('f-1');
+
+      verify(() => api.put<dynamic>(path: '/files/file/f-1/restore')).called(1);
+    });
+
+    test('passes a failure on to the caller', () async {
+      const failure = ApiFailure(
+        message: 'File not found',
+        kind: ApiFailureKind.notFound,
+      );
+      when(() => api.put<dynamic>(path: any(named: 'path'))).thenThrow(failure);
+
+      await expectLater(datasource.restoreFile('f-1'), throwsA(failure));
+    });
+  });
 }

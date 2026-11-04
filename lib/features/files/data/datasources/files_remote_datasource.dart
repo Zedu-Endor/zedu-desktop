@@ -8,6 +8,9 @@ abstract class FilesRemoteDataSource {
     required FilesScope view,
     String? parentId,
   });
+
+  /// Brings a file back from the trash.
+  Future<void> restoreFile(String fileId);
 }
 
 /// Talks to the same `/files` endpoints as the web app. The server picks
@@ -68,5 +71,10 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
         .whereType<Map<dynamic, dynamic>>()
         .map((e) => FileFolder.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+  }
+
+  @override
+  Future<void> restoreFile(String fileId) async {
+    await apiBaseService.put<dynamic>(path: '/files/file/$fileId/restore');
   }
 }
