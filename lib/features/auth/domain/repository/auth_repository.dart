@@ -9,6 +9,7 @@ abstract interface class AuthRepository {
     required String password,
   });
   Future<Result<User>> getCurrentUser();
+  Future<Result<void>> logout();
   Future<Result<void>> sendMagicLink({required String email});
   Future<Result<AuthSession>> verifyMagicLink({required String token});
   Future<Result<AuthSession>> signInWithGoogle({

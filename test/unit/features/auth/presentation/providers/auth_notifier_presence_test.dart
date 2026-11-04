@@ -181,6 +181,8 @@ Future<(ProviderContainer, AuthNotifier, MockAuthRepository)> _buildSession({
   addTearDown(container.dispose);
 
   when(() => storage.getAccessToken()).thenAnswer((_) async => 'token');
+  when(() => storage.deleteAccessToken()).thenAnswer((_) async {});
+  when(() => repo.logout()).thenAnswer((_) async => const Success(null));
   when(
     () => repo.getCurrentUser(),
   ).thenAnswer((_) async => Success(seedUser ?? _buildUser()));

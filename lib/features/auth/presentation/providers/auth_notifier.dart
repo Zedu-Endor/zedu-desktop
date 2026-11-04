@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 class AuthNotifier extends Notifier<AuthState> {
+  /// How long signing out waits for the server before going ahead locally.
+  @visibleForTesting
+  static const logoutRequestTimeout = Duration(seconds: 5);
+
   late AuthRepository _repository;
   late SecureStorageService _storage;
   late AuthInterceptor _interceptor;
@@ -302,8 +307,19 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// Revokes the session on the server, then clears it locally. The token is
+  /// still needed for the request, so it goes first. A failed or slow request
+  /// (offline, for example) never stops the user from signing out here.
   Future<void> logout() async {
     AppLogger.i('Logout — clearing session', tag: _tag);
+    try {
+      final result = await _repository.logout().timeout(logoutRequestTimeout);
+      if (result case Failure(:final error)) {
+        AppLogger.w('Could not revoke the session: $error', tag: _tag);
+      }
+    } on TimeoutException {
+      AppLogger.w('Timed out revoking the session', tag: _tag);
+    }
     await _storage.deleteAccessToken();
     _bumpSession();
     ref.read(userMenuStateProvider.notifier).reset();

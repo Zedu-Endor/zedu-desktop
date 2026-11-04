@@ -191,6 +191,18 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Result<void>> logout() async {
+    try {
+      await _remote.logout();
+      return const Success(null);
+    } on ApiFailure catch (failure) {
+      return Failure(failure);
+    } catch (error) {
+      return Failure(ApiFailure.unknown(error));
+    }
+  }
+
+  @override
   Future<Result<void>> changePassword({
     required String email,
     required String oldPassword,
