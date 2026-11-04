@@ -512,7 +512,8 @@ void main() {
 
         expect(
           recorder.requests.any(
-            (request) => request.path == '/organisations/org-1/roles',
+            // ApiBaseService sends paths without the leading slash.
+            (request) => request.path == 'organisations/org-1/roles',
           ),
           isTrue,
           reason: 'the notifier must look up the organisation roles',

@@ -5,6 +5,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+/// In-memory storage so HomeView's drafts and settings don't need the
+/// platform keychain.
+class _MemoryStorage extends Fake implements SecureStorageService {
+  final _values = <String, String>{};
+
+  @override
+  Future<String?> getAccessToken() async => null;
+
+  @override
+  Future<String?> readData(String key) async => _values[key];
+
+  @override
+  Future<void> writeData(String key, String value) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> deleteValue(String key) async {
+    _values.remove(key);
+  }
+}
+
 class _FakeAuthNotifier extends AuthNotifier {
   @override
   AuthState build() => const AuthState(status: AuthStatus.authenticated);
@@ -77,6 +99,8 @@ Widget _buildHomeView(_FakeUserProfileNotifier userProfileNotifier) {
       authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
       creditsNotifierProvider.overrideWith(_FakeCreditsNotifier.new),
       channelProvider.overrideWith(_FakeChannelNotifier.new),
+      // #general has no messages yet, which is when the invite CTA shows.
+      channelHistoryProvider('1').overrideWith((ref) async => const []),
       userProfileNotifierProvider.overrideWith(() => userProfileNotifier),
     ],
     child: MaterialApp(
@@ -103,7 +127,11 @@ Future<void> _pumpHomeView(
   if (settle) {
     await tester.pumpAndSettle();
   } else {
-    await tester.pump(const Duration(milliseconds: 100));
+    // The channel list and then its (empty) history load before the CTA
+    // shows, so give each its own frame.
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 }
 
@@ -127,28 +155,10 @@ Future<void> _loadAppFonts() async {
     }
     await loader.load();
   }
-  var flutterRoot = File(Platform.resolvedExecutable).parent;
-  final iconFontPath = [
-    'bin',
-    'cache',
-    'artifacts',
-    'material_fonts',
-    'materialicons-regular.otf',
-  ].join(Platform.pathSeparator);
-  while (flutterRoot.path != flutterRoot.parent.path &&
-      !File(
-        '${flutterRoot.path}${Platform.pathSeparator}$iconFontPath',
-      ).existsSync()) {
-    flutterRoot = flutterRoot.parent;
-  }
-  final iconFont = File(
-    '${flutterRoot.path}${Platform.pathSeparator}$iconFontPath',
-  );
-  if (!iconFont.existsSync()) {
-    throw StateError('Flutter Material Icons font was not found.');
-  }
+  // `flutter test` bundles the Material Icons font with the test assets
+  // (uses-material-design), so this works wherever Flutter is installed.
   final iconLoader = FontLoader('MaterialIcons')
-    ..addFont(Future.value(ByteData.sublistView(iconFont.readAsBytesSync())));
+    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
   await iconLoader.load();
   final wordmarkLoader = FontLoader('Poetsen One')
     ..addFont(
@@ -163,6 +173,19 @@ Future<void> _loadAppFonts() async {
 
 void main() {
   setUpAll(_loadAppFonts);
+
+  setUp(() {
+    locator.registerSingleton<AppConfig>(
+      // Mock data lets the workspace list load without a network.
+      const AppConfig(
+        apiBaseUrl: 'https://api.example.com',
+        usesMockData: true,
+      ),
+    );
+    locator.registerSingleton<SecureStorageService>(_MemoryStorage());
+  });
+
+  tearDown(locator.reset);
 
   group('HomeView invite onboarding CTA', () {
     testWidgets('shows the approved invitation copy and accessible CTA', (
