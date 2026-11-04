@@ -108,6 +108,7 @@ final dmConversationActionsProvider =
 class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
   int _currentPage = 1;
   bool _hasMore = true;
+  bool _isLoadingMore = false;
 
   /// Changes on every reload, so a page still in flight from before can be
   /// dropped.
@@ -119,6 +120,7 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
   Future<List<DmConversation>> build() async {
     final orgId = ref.watch(currentOrgIdProvider);
     _listVersion++;
+    _isLoadingMore = false;
     if (orgId.isEmpty) return const [];
 
     _currentPage = 1;
@@ -137,16 +139,25 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
   }
 
   Future<void> loadMore() async {
-    if (!_hasMore) return;
+    if (!_hasMore || _isLoadingMore) return;
     final orgId = ref.read(currentOrgIdProvider);
     if (orgId.isEmpty) return;
 
+    _isLoadingMore = true;
     final current = state.value ?? [];
     final version = _listVersion;
     _currentPage++;
-    final next = await _fetchPage(orgId, _currentPage);
-    if (version != _listVersion) return;
-    state = AsyncValue.data([...current, ...next]);
+    try {
+      final next = await _fetchPage(orgId, _currentPage);
+      if (version != _listVersion) return;
+      state = AsyncValue.data([...current, ...next]);
+    } catch (_) {
+      if (version == _listVersion) {
+        _currentPage--;
+      }
+    } finally {
+      _isLoadingMore = false;
+    }
   }
 
   Future<void> refresh() async {
@@ -154,6 +165,7 @@ class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
     if (orgId.isEmpty) return;
 
     _listVersion++;
+    _isLoadingMore = false;
     _currentPage = 1;
     _hasMore = true;
     state = const AsyncValue.loading();

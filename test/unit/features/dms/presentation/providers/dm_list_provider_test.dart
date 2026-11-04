@@ -118,6 +118,32 @@ void main() {
     expect(listedIds(), _fullPage('org-a', 1).map((c) => c.channelId));
     expect(notifier.hasMore, isTrue);
   });
+
+  test(
+    'a failed loadMore does not advance page and retries the same page (Ziki #2604)',
+    () async {
+      repository.hold('org-a', 2);
+      final notifier = container.read(dmListProvider.notifier);
+      final pending = notifier.loadMore();
+
+      repository.held['org-a/2']!.completeError(Exception('network error'));
+      await pending;
+
+      // Clear the held error so the second attempt can succeed
+      repository.held.remove('org-a/2');
+
+      // Next loadMore should retry page 2 rather than skipping to page 3
+      await notifier.loadMore();
+
+      expect(
+        listedIds(),
+        [
+          ..._fullPage('org-a', 1),
+          ..._fullPage('org-a', 2),
+        ].map((c) => c.channelId),
+      );
+    },
+  );
 }
 
 /// Returns the same conversations for every page.
