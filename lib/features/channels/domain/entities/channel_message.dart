@@ -27,18 +27,47 @@ class ChannelMessage {
       avatarUrl:
           nonEmpty(json['avatar_url']) ?? nonEmpty(json['default_avatar_url']),
       // Messages sent from the web app arrive as HTML (`<p>hi</p>`).
-      text: (json['message']?.toString() ?? '')
-          .replaceAll(
-            RegExp(r'</(p|div|li)>\s*<(p|div|li|ul|ol)\b[^>]*>|<br\s*/?>'),
-            '\n',
-          )
-          .replaceAll(RegExp(r'<[^>]*>'), '')
-          .replaceAll('&nbsp;', ' ')
-          .replaceAll('&amp;', '&')
-          .trim(),
+      text: _decodeHtmlEntities(
+        (json['message']?.toString() ?? '')
+            .replaceAll(
+              RegExp(r'</(p|div|li)>\s*<(p|div|li|ul|ol)\b[^>]*>|<br\s*/?>'),
+              '\n',
+            )
+            .replaceAll(RegExp(r'<[^>]*>'), ''),
+      ).trim(),
       createdAt: DateTime.tryParse(
         json['created_at']?.toString() ?? '',
       )?.toLocal(),
+    );
+  }
+
+  /// Decodes in a single pass, so `&amp;lt;` stays the literal text `&lt;`.
+  static String _decodeHtmlEntities(String text) {
+    const named = {
+      'nbsp': ' ',
+      'amp': '&',
+      'lt': '<',
+      'gt': '>',
+      'quot': '"',
+      'apos': "'",
+    };
+
+    return text.replaceAllMapped(
+      RegExp(r'&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|(nbsp|amp|lt|gt|quot|apos));'),
+      (match) {
+        final name = match[3];
+        if (name != null) return named[name]!;
+
+        final code = match[1] != null
+            ? int.tryParse(match[1]!)
+            : int.tryParse(match[2]!, radix: 16);
+        final isCharacter =
+            code != null &&
+            code > 0 &&
+            code <= 0x10FFFF &&
+            (code < 0xD800 || code > 0xDFFF);
+        return isCharacter ? String.fromCharCode(code) : match[0]!;
+      },
     );
   }
 }

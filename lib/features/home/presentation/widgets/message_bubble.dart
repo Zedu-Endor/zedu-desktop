@@ -264,6 +264,9 @@ class _MessageBody extends StatelessWidget {
     Widget markdownWidget = cleanText.isNotEmpty
         ? MarkdownBody(
             data: cleanText,
+            onTapLink: (_, href, _) {
+              if (href != null) openMessageLink(href);
+            },
             styleSheet: MarkdownStyleSheet(
               p: TextStyle(fontSize: 14, color: colors.textPrimary),
               strong: TextStyle(

@@ -39,6 +39,16 @@ class FilesView extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (state.view != FilesScope.trash) ...[
+                  const _UploadButton(),
+                  const SizedBox(width: 12),
+                  _HeaderButton(
+                    icon: Icons.create_new_folder_outlined,
+                    label: 'New Folder',
+                    onPressed: () => _newFolder(context),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 IconButton(
                   tooltip: 'Refresh',
                   icon: Icon(Icons.refresh, color: colors.textSecondary),
@@ -196,17 +206,32 @@ class _FoldersSection extends ConsumerWidget {
         body: 'Check your connection and try again.',
         onRetry: () => ref.invalidate(foldersListProvider),
       ),
-      data: (folders) => folders.isEmpty
-          ? const _Message(
-              icon: Icons.folder_open_outlined,
-              title: 'No folders',
-              body: 'Folders in this list appear here.',
-            )
-          : FoldersTable(
-              folders: folders,
+      data: (page) {
+        if (page.folders.isEmpty) {
+          return const _Message(
+            icon: Icons.folder_open_outlined,
+            title: 'No folders',
+            body: 'Folders in this list appear here.',
+          );
+        }
+        final notifier = ref.read(filesProvider.notifier);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FoldersTable(
+              folders: page.folders,
               ownerNameOf: ownerName,
-              onOpen: ref.read(filesProvider.notifier).openFolder,
+              onOpen: notifier.openFolder,
             ),
+            if (page.totalPages > 1)
+              _Pagination(
+                current: page.currentPage,
+                total: page.totalPages,
+                onChanged: notifier.setFolderPage,
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -253,7 +278,12 @@ class _FilesSection extends ConsumerWidget {
                   file.owner.isNotEmpty ? file.owner : ownerName(file.userId),
               onOpen: _open,
             ),
-            if (page.totalPages > 1) _Pagination(page: page),
+            if (page.totalPages > 1)
+              _Pagination(
+                current: page.currentPage,
+                total: page.totalPages,
+                onChanged: ref.read(filesProvider.notifier).setPage,
+              ),
           ],
         );
       },
@@ -261,16 +291,20 @@ class _FilesSection extends ConsumerWidget {
   }
 }
 
-class _Pagination extends ConsumerWidget {
-  const _Pagination({required this.page});
+class _Pagination extends StatelessWidget {
+  const _Pagination({
+    required this.current,
+    required this.total,
+    required this.onChanged,
+  });
 
-  final FilesPage page;
+  final int current;
+  final int total;
+  final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colors = context.colors;
-    final notifier = ref.read(filesProvider.notifier);
-    final current = page.currentPage;
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -280,10 +314,10 @@ class _Pagination extends ConsumerWidget {
           IconButton(
             tooltip: 'Previous page',
             icon: const Icon(Icons.chevron_left),
-            onPressed: current > 1 ? () => notifier.setPage(current - 1) : null,
+            onPressed: current > 1 ? () => onChanged(current - 1) : null,
           ),
           Text(
-            'Page $current of ${page.totalPages}',
+            'Page $current of $total',
             style: context.textTheme.bodyMedium?.copyWith(
               fontSize: 13,
               color: colors.textPrimary,
@@ -292,12 +326,112 @@ class _Pagination extends ConsumerWidget {
           IconButton(
             tooltip: 'Next page',
             icon: const Icon(Icons.chevron_right),
-            onPressed: current < page.totalPages
-                ? () => notifier.setPage(current + 1)
-                : null,
+            onPressed: current < total ? () => onChanged(current + 1) : null,
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _newFolder(BuildContext context) async {
+  final created = await CreateFolderDialog.show(context);
+  if (created && context.mounted) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Folder created')));
+  }
+}
+
+/// Picks files and uploads them, showing progress on the button.
+class _UploadButton extends ConsumerWidget {
+  const _UploadButton();
+
+  Future<void> _upload(BuildContext context, WidgetRef ref) async {
+    final result = await FilePicker.pickFiles(
+      allowMultiple: true,
+      type: FileType.any,
+    );
+    if (result == null) return;
+    final files = result.files
+        .where((PlatformFile f) => f.path != null)
+        .map((PlatformFile f) => XFile(f.path!, name: f.name))
+        .toList();
+    if (files.isEmpty) return;
+
+    final outcome = await ref
+        .read(filesActionsProvider.notifier)
+        .uploadFiles(files);
+    if (!context.mounted) return;
+    final failed = outcome.failedNames;
+    final message = failed.isEmpty
+        ? (outcome.uploaded == 1
+              ? 'File uploaded'
+              : '${outcome.uploaded} files uploaded')
+        : outcome.uploaded == 0
+        ? 'Could not upload ${failed.length == 1 ? failed.first : '${failed.length} files'}'
+        : '${outcome.uploaded} uploaded, ${failed.length} failed: '
+              '${failed.join(', ')}';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uploadsLeft = ref.watch(
+      filesActionsProvider.select((s) => s.uploadsLeft),
+    );
+    return _HeaderButton(
+      icon: Icons.file_upload_outlined,
+      label: uploadsLeft > 0 ? 'Uploading ($uploadsLeft)…' : 'Upload File',
+      isBusy: uploadsLeft > 0,
+      onPressed: uploadsLeft > 0 ? null : () => _upload(context, ref),
+    );
+  }
+}
+
+/// The outlined Upload File and New Folder buttons.
+class _HeaderButton extends StatelessWidget {
+  const _HeaderButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.isBusy = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isBusy;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colors.primary,
+        disabledForegroundColor: colors.primary.withValues(alpha: 0.6),
+        side: BorderSide(color: colors.borderOutline),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        textStyle: context.textTheme.labelLarge?.copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      icon: isBusy
+          ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colors.primary,
+              ),
+            )
+          : Icon(icon, size: 18),
+      label: Text(label),
     );
   }
 }

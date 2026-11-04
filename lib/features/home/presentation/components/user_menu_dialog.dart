@@ -1,6 +1,18 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+/// Widest the profile menu card grows, so it does not crowd the workspace.
+const double _maxCardWidth = 288;
+
+/// Narrowest the card shrinks to on small desktop windows.
+const double _minCardWidth = 240;
+
+/// Gap between the sidebar rail and the card's left edge.
+const double _railGap = 8;
+
+/// Horizontal padding shared by the card's rows and menu items.
+const double _cardHorizontalPadding = 12;
+
 class UserMenuDialog extends ConsumerWidget {
   const UserMenuDialog({super.key});
 
@@ -15,13 +27,28 @@ class UserMenuDialog extends ConsumerWidget {
     final signOutTarget = orgSlug.isEmpty ? 'Zedu' : orgSlug;
     final isOnline = status.online;
 
+    // Sit the card just outside the rail and keep it inside the window: it
+    // grows to [_maxCardWidth] and shrinks on windows too narrow for that.
+    final cardWidth =
+        (MediaQuery.sizeOf(context).width -
+                AppSidebarRail.width -
+                _railGap -
+                16)
+            .clamp(_minCardWidth, _maxCardWidth)
+            .toDouble();
+
     return Dialog(
-      insetPadding: const EdgeInsets.only(bottom: 24, left: 74),
+      insetPadding: const EdgeInsets.only(
+        left: AppSidebarRail.width + _railGap,
+        right: 16,
+        bottom: 24,
+      ),
       alignment: Alignment.bottomLeft,
       backgroundColor: colors.background,
       child: Container(
-        width: 320,
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        key: const ValueKey('user_menu_card'),
+        width: cardWidth,
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: colors.background,
           borderRadius: BorderRadius.circular(12),
@@ -40,7 +67,7 @@ class UserMenuDialog extends ConsumerWidget {
               // ── Profile header ─────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
+                  horizontal: _cardHorizontalPadding,
                   vertical: 8,
                 ),
                 child: Row(
@@ -102,12 +129,16 @@ class UserMenuDialog extends ConsumerWidget {
                                 color: colors.primary,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                '$balance AI credits',
-                                style: TextStyle(
-                                  color: colors.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                              Flexible(
+                                child: Text(
+                                  '$balance AI credits',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: colors.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
@@ -124,8 +155,11 @@ class UserMenuDialog extends ConsumerWidget {
 
               // ── Custom status row ──────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _cardHorizontalPadding,
+                ),
                 child: InkWell(
+                  mouseCursor: SystemMouseCursors.click,
                   borderRadius: BorderRadius.circular(8),
                   onTap: () async {
                     Navigator.pop(context);
@@ -316,9 +350,13 @@ class _MenuItemButton extends StatelessWidget {
     final resolvedIconColor = iconColor ?? itemColor;
 
     return InkWell(
+      mouseCursor: SystemMouseCursors.click,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: _cardHorizontalPadding,
+          vertical: 8,
+        ),
         child: Row(
           children: [
             Icon(icon, size: 20, color: resolvedIconColor),

@@ -17,8 +17,18 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  late final _loginLink = TapGestureRecognizer()
+    ..onTap = () => context.go(AppRouter.login);
+  late final _termsLink = TapGestureRecognizer()
+    ..onTap = () => launchUrl(_termsUrl);
+  late final _privacyLink = TapGestureRecognizer()
+    ..onTap = () => launchUrl(_privacyUrl);
+
   @override
   void dispose() {
+    _loginLink.dispose();
+    _termsLink.dispose();
+    _privacyLink.dispose();
     _emailController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -98,8 +108,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                         color: context.colors.primary,
                         fontFamily: FontFamily.roboto,
                       ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => context.go(AppRouter.login),
+                      recognizer: _loginLink,
                     ),
                   ],
                 ),
@@ -222,11 +231,12 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                 SocialAuthButton(
                   icon: 'assets/svgs/google_logo.svg',
                   label: 'Sign up with Google',
-                  onPressed: () => AppToastService.show(
-                    context,
-                    type: AppToastType.info,
-                    message: 'Google sign up is not available yet.',
-                  ),
+                  // The same Google flow as Login: the backend creates the
+                  // account on first use, and the listener above handles
+                  // success (go home) and errors (toast).
+                  loading: authState.isLoading,
+                  onPressed: () =>
+                      ref.read(authNotifierProvider.notifier).loginWithGoogle(),
                 ),
                 context.gapV(12),
                 SocialAuthButton(
@@ -247,21 +257,19 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                     ),
                     children: [
                       TextSpan(
-                        text: 'terms of service',
+                        text: 'Terms of Service',
                         style: context.textTheme.bodySmall?.copyWith(
                           color: context.colors.primary,
                         ),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () => launchUrl(_termsUrl),
+                        recognizer: _termsLink,
                       ),
                       const TextSpan(text: ' and '),
                       TextSpan(
-                        text: 'privacy policy',
+                        text: 'Privacy Policy',
                         style: context.textTheme.bodySmall?.copyWith(
                           color: context.colors.primary,
                         ),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () => launchUrl(_privacyUrl),
+                        recognizer: _privacyLink,
                       ),
                     ],
                   ),

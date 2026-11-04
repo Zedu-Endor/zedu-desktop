@@ -32,7 +32,8 @@ class DmListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final selected = ref.watch(selectedDmProvider);
-    final isSelected = selected?.channelId == conversation.channelId;
+    final isSelected =
+        selected?.conversationKey == conversation.conversationKey;
     final hasUnread = conversation.unreadCount > 0;
     final borderRadius = BorderRadius.circular(6);
 
@@ -40,11 +41,12 @@ class DmListTile extends ConsumerWidget {
     // created/edited/cleared. Kick off a one-shot load for entries not yet
     // cached (load() notifies listeners when done, which rebuilds this tile).
     final draftStore = ref.watch(dmDraftStoreProvider);
-    final draftEntry = draftStore.peek(conversation.channelId);
-    if (draftEntry == null && !draftStore.hasLoaded(conversation.channelId)) {
+    final draftKey = conversation.conversationKey;
+    final draftEntry = draftStore.peek(draftKey);
+    if (draftEntry == null && !draftStore.hasLoaded(draftKey)) {
       scheduleMicrotask(() {
         if (context.mounted) {
-          ref.read(dmDraftStoreProvider).load(conversation.channelId);
+          ref.read(dmDraftStoreProvider).load(draftKey);
         }
       });
     }
@@ -110,7 +112,7 @@ class DmListTile extends ConsumerWidget {
               : null,
           child: conversation.effectiveAvatarUrl == null
               ? Text(
-                  conversation.displayName[0].toUpperCase(),
+                  avatarInitial(conversation.displayName),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,

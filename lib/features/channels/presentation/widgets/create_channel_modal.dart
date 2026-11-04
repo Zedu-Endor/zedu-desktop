@@ -27,7 +27,10 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
   }
 
   Future<void> _createChannel() async {
-    if (_nameController.text.trim().isEmpty) return;
+    if (_nameController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Channel name is required');
+      return;
+    }
     // A second tap before the screen rebuilds must not start a second create.
     if (_isCreating) return;
     setState(() {
@@ -97,6 +100,11 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
+              onChanged: (_) {
+                if (_errorMessage != null) {
+                  setState(() => _errorMessage = null);
+                }
+              },
               decoration: InputDecoration(
                 hintText: 'e.g. plan-budget',
                 border: OutlineInputBorder(

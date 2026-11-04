@@ -26,6 +26,13 @@ abstract class ChannelRemoteDataSource {
 
   /// The latest messages of a channel, newest first.
   Future<List<ChannelMessage>> fetchChannelMessages(String channelId);
+
+  /// Stars the channel for this user, or unstars it if it is already starred.
+  /// Returns whether it is starred now.
+  Future<bool> toggleStarChannel({
+    required String orgId,
+    required String channelId,
+  });
 }
 
 class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
@@ -49,6 +56,22 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     return data
         .map((e) => Channel.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  @override
+  Future<bool> toggleStarChannel({
+    required String orgId,
+    required String channelId,
+  }) async {
+    final response = await apiBaseService.post<Map<String, dynamic>>(
+      path: '/organisations/$orgId/channels/$channelId/star',
+    );
+    final data = response.data['data'] as Map<String, dynamic>?;
+    final isStarred = data?['is_starred'] as bool?;
+    if (isStarred == null) {
+      throw Exception('No star state returned from toggle star');
+    }
+    return isStarred;
   }
 
   @override

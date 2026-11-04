@@ -34,4 +34,41 @@ void main() {
       semantics.dispose();
     });
   });
+
+  group('AppTextField error borders', () {
+    testWidgets(
+      'defines errorBorder and focusedErrorBorder with 6px radius and error color',
+      (tester) async {
+        await tester.pumpWidget(
+          buildTestMaterialApp(
+            Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.all(24),
+                child: AppTextField(
+                  controller: TextEditingController(),
+                  hint: 'Email',
+                  validator: (val) => 'Invalid email',
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final textField = tester.widget<TextField>(find.byType(TextField));
+        final decoration = textField.decoration;
+        expect(decoration, isNotNull);
+
+        final errorBorder = decoration?.errorBorder as OutlineInputBorder?;
+        expect(errorBorder, isNotNull);
+        expect(errorBorder?.borderRadius, BorderRadius.circular(6));
+        expect(errorBorder?.borderSide.color, AppPalette.light.error);
+
+        final focusedErrorBorder =
+            decoration?.focusedErrorBorder as OutlineInputBorder?;
+        expect(focusedErrorBorder, isNotNull);
+        expect(focusedErrorBorder?.borderRadius, BorderRadius.circular(6));
+        expect(focusedErrorBorder?.borderSide.color, AppPalette.light.error);
+      },
+    );
+  });
 }

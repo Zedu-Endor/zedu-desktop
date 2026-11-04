@@ -4,3 +4,4 @@ export 'extensions.dart';
 export 'validators.dart';
 export 'logger.dart';
 export 'email_mask.dart';
+export 'initials.dart';

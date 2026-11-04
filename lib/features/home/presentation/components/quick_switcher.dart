@@ -42,10 +42,14 @@ class QuickSwitcherDialog extends StatefulWidget {
   final List<QuickSwitcherEntry> entries;
   final ValueChanged<QuickSwitcherEntry> onSelected;
 
+  /// Whether more entries are still on their way.
+  final bool loading;
+
   const QuickSwitcherDialog({
     super.key,
     required this.entries,
     required this.onSelected,
+    this.loading = false,
   });
 
   @override
@@ -56,11 +60,32 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
   final TextEditingController _controller = TextEditingController();
   late List<QuickSwitcherEntry> _results = widget.entries;
   int _highlighted = 0;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(QuickSwitcherDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(widget.entries, oldWidget.entries)) return;
+
+    // Entries arriving must not move the highlight to a different row, or
+    // Enter would open something the user didn't pick.
+    final highlighted = _results.isEmpty ? null : _results[_highlighted];
+    _results = filterQuickSwitcherEntries(widget.entries, _controller.text);
+    final kept = highlighted == null
+        ? -1
+        : _results.indexWhere(
+            (entry) =>
+                entry.label == highlighted.label &&
+                entry.isChannel == highlighted.isChannel,
+          );
+    _highlighted = kept < 0 ? 0 : kept;
   }
 
   void _onQueryChanged(String query) {
@@ -68,12 +93,33 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
       _results = filterQuickSwitcherEntries(widget.entries, query);
       _highlighted = 0;
     });
+    _revealHighlighted();
   }
 
   void _moveHighlight(int delta) {
     if (_results.isEmpty) return;
     setState(() {
       _highlighted = (_highlighted + delta) % _results.length;
+    });
+    _revealHighlighted();
+  }
+
+  /// Scrolls just enough to show the highlighted row once the list has laid
+  /// out. Every row has the same height, so its position follows from its index.
+  void _revealHighlighted() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients || _results.isEmpty) return;
+      final position = _scrollController.position;
+      final viewport = position.viewportDimension;
+      final rowHeight = (position.maxScrollExtent + viewport) / _results.length;
+      final top = _highlighted * rowHeight;
+      final bottom = top + rowHeight;
+
+      if (top < position.pixels) {
+        _scrollController.jumpTo(top);
+      } else if (bottom > position.pixels + viewport) {
+        _scrollController.jumpTo(bottom - viewport);
+      }
     });
   }
 
@@ -124,11 +170,12 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
                     ? Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(
-                          'No matches',
+                          widget.loading ? 'Loading…' : 'No matches',
                           style: TextStyle(color: colors.textHint),
                         ),
                       )
                     : ListView.builder(
+                        controller: _scrollController,
                         shrinkWrap: true,
                         itemCount: _results.length,
                         itemBuilder: (context, index) => _QuickSwitcherRow(
@@ -138,6 +185,14 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
                         ),
                       ),
               ),
+              if (widget.loading && _results.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Loading…',
+                    style: TextStyle(color: colors.textHint),
+                  ),
+                ),
             ],
           ),
         ),

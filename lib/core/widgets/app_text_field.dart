@@ -117,6 +117,14 @@ class _AppTextFieldState extends State<AppTextField> {
                 borderRadius: BorderRadius.circular(6),
                 borderSide: BorderSide(color: context.colors.primary),
               ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: context.colors.error),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: context.colors.error),
+              ),
               prefixIcon: widget.prefix != null
                   ? Row(
                       mainAxisSize: MainAxisSize.min,

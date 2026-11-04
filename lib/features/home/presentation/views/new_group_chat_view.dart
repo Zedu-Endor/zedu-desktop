@@ -79,6 +79,28 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
     });
   }
 
+  String _getMemberDisplayName(TeamMember member) {
+    final name = member.name?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+    final emailPrefix = member.email.split('@').first.trim();
+    if (emailPrefix.isNotEmpty) {
+      return emailPrefix;
+    }
+    return 'Member';
+  }
+
+  String _getMemberInitials(String displayName) {
+    final clean = displayName.trim();
+    if (clean.isEmpty) return '?';
+    final runes = clean.runes.toList();
+    if (runes.length > 1) {
+      return String.fromCharCodes(runes.take(2)).toUpperCase();
+    }
+    return String.fromCharCode(runes.first).toUpperCase();
+  }
+
   Future<void> _handleCreate() async {
     if (_selectedMembers.length < 2) return;
 
@@ -184,20 +206,14 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: _selectedMembers.map((member) {
-                                  final name =
-                                      member.name ??
-                                      member.email.split('@').first;
+                                  final name = _getMemberDisplayName(member);
+                                  final initials = _getMemberInitials(name);
                                   return Chip(
                                     avatar: CircleAvatar(
                                       backgroundColor: colors.primary
                                           .withValues(alpha: 0.15),
                                       child: Text(
-                                        name
-                                            .substring(
-                                              0,
-                                              name.length > 1 ? 2 : 1,
-                                            )
-                                            .toUpperCase(),
+                                        initials,
                                         style: TextStyle(
                                           color: colors.primary,
                                           fontSize: 10,
@@ -268,9 +284,8 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                   itemCount: _filteredMembers.length,
                                   itemBuilder: (context, index) {
                                     final member = _filteredMembers[index];
-                                    final name =
-                                        member.name ??
-                                        member.email.split('@').first;
+                                    final name = _getMemberDisplayName(member);
+                                    final initials = _getMemberInitials(name);
                                     return InkWell(
                                       onTap: () =>
                                           _toggleMemberSelection(member),
@@ -295,12 +310,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                               backgroundColor: colors.primary
                                                   .withValues(alpha: 0.1),
                                               child: Text(
-                                                name
-                                                    .substring(
-                                                      0,
-                                                      name.length > 1 ? 2 : 1,
-                                                    )
-                                                    .toUpperCase(),
+                                                initials,
                                                 style: TextStyle(
                                                   color: colors.primary,
                                                   fontSize: 12,
@@ -484,7 +494,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       child: Row(
         children: [
           Text(
-            'New Group Chat',
+            'New message',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -506,7 +516,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       child: Row(
         children: [
           Text(
-            'With: ',
+            'To: ',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
@@ -559,14 +569,16 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
           color: isReady ? colors.success : colors.error,
         ),
         const SizedBox(width: 8),
-        Text(
-          isReady
-              ? 'Ready to create conversation! (Selected: $count members)'
-              : 'Select at least 2 members to start a group DM (Selected: $count/2)',
-          style: TextStyle(
-            color: isReady ? colors.success : colors.error,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            isReady
+                ? 'Ready to create conversation! (Selected: $count members)'
+                : 'Select at least 2 members to start a group DM (Selected: $count/2)',
+            style: TextStyle(
+              color: isReady ? colors.success : colors.error,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

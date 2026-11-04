@@ -13,6 +13,9 @@ class DmMessageComposer extends ConsumerStatefulWidget {
   final String recipientName;
   final String? hintText;
   final String channelId;
+
+  /// Where the draft is saved. Defaults to [channelId].
+  final String? draftKey;
   final List<DmParticipant> participants;
   final ValueChanged<String>? onSend;
   final bool isChannel;
@@ -22,6 +25,7 @@ class DmMessageComposer extends ConsumerStatefulWidget {
     required this.recipientName,
     this.hintText,
     required this.channelId,
+    this.draftKey,
     this.participants = const [],
     this.onSend,
     this.isChannel = false,
@@ -61,8 +65,10 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   List<DmParticipant> _mentionSuggestions = [];
   String _mentionQuery = '';
 
-  /// channelId whose draft this composer instance is currently bound to.
+  /// Draft key this composer instance is currently bound to.
   String? _draftChannelId;
+
+  String get _draftKey => widget.draftKey ?? widget.channelId;
 
   Timer? _draftSaveDebounce;
 
@@ -81,7 +87,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     _drafts = ref.read(dmDraftStoreProvider);
     _controller = RichTextController();
     _controller.addListener(_onTextChanged);
-    _draftChannelId = widget.channelId;
+    _draftChannelId = _draftKey;
     _restoreDraft();
   }
 
@@ -92,9 +98,11 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     // the chat area stays mounted. Flush the debounced save for the previous
     // conversation (the listener may have saved already; this is a no-op then),
     // then swap to the new conversation and restore its draft if any.
-    if (oldWidget.channelId != widget.channelId) {
+    if (oldWidget.channelId != widget.channelId ||
+        oldWidget.draftKey != widget.draftKey) {
       _draftSaveDebounce?.cancel();
-      final previousChannel = _draftChannelId ?? oldWidget.channelId;
+      final previousChannel =
+          _draftChannelId ?? oldWidget.draftKey ?? oldWidget.channelId;
       final previousDrafts = _drafts;
       final wasEditing = _isEditMode;
 
@@ -113,7 +121,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         );
       }
       _drafts = ref.read(dmDraftStoreProvider);
-      _draftChannelId = widget.channelId;
+      _draftChannelId = _draftKey;
       _channelDeleted = false;
 
       setState(() {
@@ -137,9 +145,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         !_channelDeleted &&
         _controller.text.trim().isNotEmpty) {
       final drafts = _drafts;
-      final channelId = _draftChannelId ?? widget.channelId;
+      final draftKey = _draftChannelId ?? _draftKey;
       final text = _controller.text;
-      Future.microtask(() => drafts.save(channelId, text));
+      Future.microtask(() => drafts.save(draftKey, text));
     }
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
@@ -165,7 +173,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   }
 
   Future<void> _restoreDraft() async {
-    final entry = await _drafts.load(widget.channelId);
+    final entry = await _drafts.load(_draftKey);
     if (!mounted) return;
     if (entry == null || _controller.text.isNotEmpty) return;
 
@@ -186,7 +194,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     _draftSaveDebounce?.cancel();
     _draftSaveDebounce = Timer(const Duration(milliseconds: 250), () {
       if (!mounted) return;
-      _drafts.save(widget.channelId, text);
+      _drafts.save(_draftKey, text);
     });
   }
 
@@ -286,7 +294,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
 
     // The message is out, so the draft no longer exists.
     _draftSaveDebounce?.cancel();
-    _drafts.clear(widget.channelId);
+    _drafts.clear(_draftKey);
 
     _controller.clear();
     // Saving an edit sends nothing, so a waiting voice note or file is kept.
@@ -770,10 +778,20 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     if (result == null) return;
     final picked = result.files
         .where((PlatformFile f) => f.path != null)
-        .map(
-          (PlatformFile f) =>
-              XFile(f.path!, name: f.name, mimeType: f.extension),
-        )
+        .map((PlatformFile f) {
+      // Validate file path to prevent path traversal and invalid files
+      if (f.path == null ||
+          f.path!.contains('..') ||
+          f.path!.startsWith('/')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid file path: ${f.path}')),
+          );
+        }
+        return null;
+      }
+      return XFile(f.path!, name: f.name, mimeType: f.extension);
+    }).whereType<XFile>()
         .toList();
     await addFiles(picked);
   }
@@ -810,6 +828,11 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final hasText = _controller.text.trim().isNotEmpty;
+    final isEditing = _isEditMode && _editingMessageId != null;
+    final hasSendableContent =
+        hasText ||
+        (!isEditing && (_pendingFiles.isNotEmpty || _voiceNote != null));
     // A user or org change replaces the store; follow it.
     ref.listen(dmDraftStoreProvider, (_, next) => _drafts = next);
     ref.listen(
@@ -1055,9 +1078,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
                         onTap: _handleSend,
                         child: Icon(
                           Icons.send_rounded,
-                          color: _controller.text.trim().isEmpty
-                              ? colors.textHint.withValues(alpha: 0.55)
-                              : colors.primary,
+                          color: hasSendableContent
+                              ? colors.primary
+                              : colors.textHint.withValues(alpha: 0.55),
                           size: 22,
                         ),
                       ),

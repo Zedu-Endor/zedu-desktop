@@ -156,7 +156,9 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     }
   }
 
-  Future<void> changePassword({
+  /// Returns the outcome so the change password dialog can stay open and show
+  /// a failure itself, which is why a failure doesn't also set the state error.
+  Future<Result<void>> changePassword({
     required String currentPassword,
     required String newPassword,
   }) async {
@@ -176,11 +178,9 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           successMessage: 'Password updated successfully.',
         );
       case Failure<void>():
-        state = state.copyWith(
-          isSaving: false,
-          error: result.error.friendlyMessage,
-        );
+        state = state.copyWith(isSaving: false);
     }
+    return result;
   }
 
   Future<void> updateOrganization(OrganizationProfile organization) async {
@@ -189,10 +189,18 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       clearError: true,
       clearSuccess: true,
     );
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
     final result = await _repository.updateOrganization(
       organization,
-      orgId: ref.read(workspaceProvider).selectedWorkspace?.id,
+      orgId: orgId,
     );
+    if (!ref.mounted) return;
+    // The workspace changed while saving, so this response isn't about the
+    // organization on screen any more.
+    if (ref.read(workspaceProvider).selectedWorkspace?.id != orgId) {
+      state = state.copyWith(isSaving: false);
+      return;
+    }
     switch (result) {
       case Success<OrganizationProfile>():
         state = state.copyWith(
@@ -200,6 +208,11 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           isSaving: false,
           successMessage: 'Organization information saved successfully.',
         );
+        if (orgId != null) {
+          ref
+              .read(workspaceProvider.notifier)
+              .renameWorkspace(orgId, result.value.name);
+        }
       case Failure<OrganizationProfile>():
         state = state.copyWith(
           isSaving: false,

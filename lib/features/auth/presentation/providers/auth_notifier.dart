@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
@@ -107,6 +108,20 @@ class AuthNotifier extends Notifier<AuthState> {
     _interceptor = locator<AuthInterceptor>();
     ref.onDispose(() {
       _disposed = true;
+      _statusExpiryTimer?.cancel();
+    });
+    // Whenever the user (or their status) changes, re-arm the "Clear after" timer.
+    listenSelf((_, next) => _scheduleStatusExpiry(next));
+
+    // Signing out or in must never show the other session's data, however
+    // the session changed (logout, expired token, login, magic link, Google).
+    listenSelf((previous, next) {
+      final changedSession =
+          (previous?.status == AuthStatus.authenticated &&
+              next.status == AuthStatus.unauthenticated) ||
+          (previous?.status == AuthStatus.unauthenticated &&
+              next.status == AuthStatus.authenticated);
+      if (changedSession) _resetSessionData();
     });
 
     _interceptor.onUnauthorized = () {
@@ -117,6 +132,29 @@ class AuthNotifier extends Notifier<AuthState> {
     };
     _restoreSession();
     return const AuthState(status: AuthStatus.unknown);
+  }
+
+  /// Rebuilds everything that belongs to one signed-in session. These providers
+  /// live in the root scope, so they otherwise outlast sign-out.
+  void _resetSessionData() {
+    ref
+      ..invalidate(workspaceProvider)
+      ..invalidate(userProfileNotifierProvider)
+      ..invalidate(creditsNotifierProvider)
+      ..invalidate(channelProvider)
+      ..invalidate(dmListProvider)
+      ..invalidate(selectedDmProvider)
+      ..invalidate(dmConversationActionsProvider)
+      ..invalidate(chatHistoryProvider)
+      ..invalidate(activeChatProvider)
+      ..invalidate(activeCallProvider)
+      ..invalidate(groupDmProvider)
+      ..invalidate(homeSidebarProvider)
+      ..invalidate(personalProfilePanelProvider)
+      ..invalidate(notificationSettingsProvider)
+      ..invalidate(filesProvider)
+      ..invalidate(filesListProvider)
+      ..invalidate(foldersListProvider);
   }
 
   /// Invalidates every in-flight status request and releases the presence
@@ -229,8 +267,7 @@ class AuthNotifier extends Notifier<AuthState> {
           state = const AuthState(status: AuthStatus.unauthenticated);
         } else {
           // Network, timeout or server problem: the token may still be valid.
-          // Keep it so the next launch can restore the session, and tell the
-          // user why they are on the login screen.
+          // Keep it, and let the user try again instead of signing in again.
           AppLogger.w(
             'Session restore failed (${failure.kind.name}) — keeping token',
             tag: _tag,
@@ -238,9 +275,22 @@ class AuthNotifier extends Notifier<AuthState> {
           state = AuthState(
             status: AuthStatus.unauthenticated,
             error: failure.friendlyMessage,
+            sessionRestoreFailed: true,
           );
         }
     }
+  }
+
+  /// Tries the saved session again after the server could not be reached.
+  Future<void> retrySessionRestore() async {
+    state = const AuthState(status: AuthStatus.unknown);
+    await _restoreSession();
+  }
+
+  /// Leaves the retry screen for the login form. The token is kept, so the next
+  /// launch still tries to restore the session.
+  void showLoginForm() {
+    state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
   /// With [rememberMe] false the session lasts until the app closes.
@@ -304,6 +354,15 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> logout() async {
     AppLogger.i('Logout — clearing session', tag: _tag);
+    // Unsent DM drafts are private: don't leave them on a shared computer.
+    final userId = state.user?.id;
+    if (userId != null && userId.isNotEmpty) {
+      try {
+        await DmDraftStore.deleteAllForUser(_storage, userId);
+      } catch (error) {
+        AppLogger.w('Could not remove drafts on logout - $error', tag: _tag);
+      }
+    }
     await _storage.deleteAccessToken();
     _bumpSession();
     ref.read(userMenuStateProvider.notifier).reset();
@@ -544,7 +603,12 @@ class AuthNotifier extends Notifier<AuthState> {
 
       // 3. Wait for Google's redirect containing the authorization code
       String? grantCode;
-      await for (final request in server) {
+      await for (final request in server.timeout(
+        const Duration(seconds: 60),
+        onTimeout: (sink) {
+          sink.addError(TimeoutException('Google Sign-In redirect timed out'));
+        },
+      )) {
         grantCode = request.uri.queryParameters['code'];
 
         // Return a clean success page to the user in their browser
@@ -609,6 +673,12 @@ class AuthNotifier extends Notifier<AuthState> {
             error: result.error.friendlyMessage,
           );
       }
+    } on TimeoutException {
+      AppLogger.w('Google Sign-In timed out', tag: _tag);
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Google Sign-In timed out. Please try again.',
+      );
     } catch (e) {
       AppLogger.e('Google Sign-In failed', tag: _tag, error: e);
       state = state.copyWith(isLoading: false, error: 'Google Sign-In failed');
@@ -1042,6 +1112,35 @@ class AuthNotifier extends Notifier<AuthState> {
 
   DateTime? _expiryFromTimeout(StatusTimeout timeout) =>
       timeout.expiryFrom(DateTime.now());
+
+  Timer? _statusExpiryTimer;
+
+  /// Arms one timer for the current custom status's "Clear after" time, so it
+  /// disappears while the app stays open. A status that has already expired is
+  /// cleared straight away. Signing out or changing the status re-arms it.
+  void _scheduleStatusExpiry(AuthState next) {
+    _statusExpiryTimer?.cancel();
+    _statusExpiryTimer = null;
+    final status = next.user?.status;
+    final expiresAt = status?.expiresAt;
+    if (status == null || expiresAt == null) return;
+    if (status.emoji == null && (status.text ?? '').isEmpty) return;
+    final left = expiresAt.difference(DateTime.now());
+    _statusExpiryTimer = Timer(
+      left.isNegative ? Duration.zero : left,
+      _clearExpiredStatus,
+    );
+  }
+
+  void _clearExpiredStatus() {
+    final user = state.user;
+    final expiresAt = user?.status.expiresAt;
+    if (_disposed || user == null || expiresAt == null) return;
+    // The status may have been changed since the timer was armed.
+    if (DateTime.now().isBefore(expiresAt)) return;
+    AppLogger.d('custom status expired — clearing', tag: _tag);
+    state = state.copyWith(user: user._withStatus(user.status.cleared()));
+  }
 }
 
 // Private extension to create a new User with a swapped status field.

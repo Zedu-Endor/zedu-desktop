@@ -402,6 +402,40 @@ void main() {
       expect(find.text('hello there', findRichText: true), findsOneWidget);
     });
 
+    testWidgets('opens a URL in a message when it is tapped', (tester) async {
+      final opened = <Uri>[];
+      final original = messageLinkLauncher;
+      messageLinkLauncher = (uri) async {
+        opened.add(uri);
+        return true;
+      };
+      addTearDown(() => messageLinkLauncher = original);
+
+      await pumpChat(tester, [message('m1', 'https://example.com/dm')]);
+      await tester.tap(find.text('https://example.com/dm', findRichText: true));
+      await tester.pump();
+
+      expect(opened, [Uri.parse('https://example.com/dm')]);
+    });
+
+    testWidgets('opens a URL inside bold text', (tester) async {
+      final opened = <Uri>[];
+      final original = messageLinkLauncher;
+      messageLinkLauncher = (uri) async {
+        opened.add(uri);
+        return true;
+      };
+      addTearDown(() => messageLinkLauncher = original);
+
+      await pumpChat(tester, [message('m1', '**https://example.com/bold**')]);
+      await tester.tap(
+        find.text('https://example.com/bold', findRichText: true),
+      );
+      await tester.pump();
+
+      expect(opened, [Uri.parse('https://example.com/bold')]);
+    });
+
     Finder bubbleDividers(String text) => find.descendant(
       of: find
           .ancestor(

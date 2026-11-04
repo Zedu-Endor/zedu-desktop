@@ -40,9 +40,10 @@ class RichTextController extends TextEditingController {
 
       final raw = match.group(0)!;
 
-      if (_boldRegex.hasMatch(raw)) {
-        final inner =
-            match.group(1) ?? _boldRegex.firstMatch(raw)?.group(1) ?? raw;
+      // Each alternative has one capture: style only the outer token that
+      // matched, without interpreting formatting markers inside inline code.
+      if (match.group(1) != null) {
+        final inner = match.group(1)!;
         spans.add(
           TextSpan(
             children: [
@@ -67,8 +68,8 @@ class RichTextController extends TextEditingController {
             ],
           ),
         );
-      } else if (_strikeRegex.hasMatch(raw)) {
-        final inner = _strikeRegex.firstMatch(raw)?.group(1) ?? raw;
+      } else if (match.group(3) != null) {
+        final inner = match.group(3)!;
         spans.add(
           TextSpan(
             children: [
@@ -95,8 +96,8 @@ class RichTextController extends TextEditingController {
             ],
           ),
         );
-      } else if (_codeRegex.hasMatch(raw)) {
-        final inner = _codeRegex.firstMatch(raw)?.group(1) ?? raw;
+      } else if (match.group(4) != null) {
+        final inner = match.group(4)!;
         spans.add(
           TextSpan(
             children: [
@@ -125,8 +126,8 @@ class RichTextController extends TextEditingController {
             ],
           ),
         );
-      } else if (_italicRegex.hasMatch(raw)) {
-        final inner = _italicRegex.firstMatch(raw)?.group(1) ?? raw;
+      } else if (match.group(2) != null) {
+        final inner = match.group(2)!;
         spans.add(
           TextSpan(
             children: [
