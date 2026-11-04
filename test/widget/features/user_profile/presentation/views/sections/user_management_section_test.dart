@@ -36,6 +36,80 @@ List<TeamMember> createMembers(int count) {
 }
 
 void main() {
+  group('UserManagementSection role filter (Ziki #2389)', () {
+    TeamMember member(String email, String role) => TeamMember(
+      id: email,
+      email: email,
+      name: email,
+      role: role,
+      dateJoined: 'Oct 1, 2026',
+      status: TeamMemberStatus.active,
+    );
+
+    Future<void> pickRole(WidgetTester tester, String role) async {
+      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(role).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('offers every role members have and filters by it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildUnderTest([
+          member('owner@example.com', 'Owner'),
+          member('lead@example.com', 'Project Lead'),
+          member('user@example.com', 'User'),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      final dropdown = tester.widget<DropdownButton<String>>(
+        find.byType(DropdownButton<String>),
+      );
+      expect(dropdown.items!.map((item) => item.value), [
+        'All Roles',
+        'Owner',
+        'Project Lead',
+        'User',
+      ]);
+
+      await pickRole(tester, 'Owner');
+
+      expect(find.text('owner@example.com'), findsOneWidget);
+      expect(find.text('lead@example.com'), findsNothing);
+      expect(find.text('user@example.com'), findsNothing);
+    });
+
+    testWidgets('keeps the selected role when its last member goes', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildUnderTest([
+          member('owner@example.com', 'Owner'),
+          member('user@example.com', 'User'),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      await pickRole(tester, 'Owner');
+
+      await tester.pumpWidget(
+        buildUnderTest([member('user@example.com', 'User')]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester
+            .widget<DropdownButton<String>>(find.byType(DropdownButton<String>))
+            .value,
+        'Owner',
+      );
+      expect(find.text('user@example.com'), findsNothing);
+    });
+  });
+
   group('UserManagementSection Invites tab navigation (#205 / Ziki #204)', () {
     testWidgets(
       'clicking Invites tab switches to invites view with empty state',
@@ -99,6 +173,62 @@ void main() {
       expect(find.text('No pending invitations'), findsNothing);
       expect(find.text('invited@example.com'), findsOneWidget);
       expect(find.text('Date Invited'), findsOneWidget);
+    });
+  });
+
+  group('UserManagementSection Date Joined (Ziki #2392)', () {
+    const timestamp = '2026-11-03T12:06:34.098981Z';
+
+    testWidgets('shows a member timestamp as a readable date', (tester) async {
+      await tester.pumpWidget(
+        buildUnderTest(const [
+          TeamMember(
+            id: '1',
+            email: 'active@example.com',
+            name: 'Active User',
+            role: 'Administrator',
+            dateJoined: timestamp,
+            status: TeamMemberStatus.active,
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nov 3, 2026'), findsOneWidget);
+      expect(find.text(timestamp), findsNothing);
+    });
+
+    testWidgets('formats an invite timestamp and keeps "Pending"', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildUnderTest(const [
+          TeamMember(
+            id: '1',
+            email: 'sent@example.com',
+            name: 'Sent',
+            role: 'User',
+            dateJoined: timestamp,
+            status: TeamMemberStatus.pending,
+          ),
+          TeamMember(
+            id: '2',
+            email: 'unsent@example.com',
+            name: 'Unsent',
+            role: 'User',
+            dateJoined: 'Pending',
+            status: TeamMemberStatus.pending,
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Invites'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nov 3, 2026'), findsOneWidget);
+      // The unsent invite's date, plus both invites' status pills.
+      expect(find.text('Pending'), findsNWidgets(3));
+      expect(find.text(timestamp), findsNothing);
     });
   });
 }

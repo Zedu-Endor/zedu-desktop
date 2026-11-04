@@ -13,7 +13,12 @@ class FilesState {
   final String search;
   final FilesSort sort;
   final FilesTab tab;
+
+  /// Page of the Files tab.
   final int page;
+
+  /// Page of the Folders tab.
+  final int folderPage;
 
   const FilesState({
     this.view = FilesScope.all,
@@ -24,6 +29,7 @@ class FilesState {
     this.sort = FilesSort.newestFirst,
     this.tab = FilesTab.folders,
     this.page = 1,
+    this.folderPage = 1,
   });
 
   String? get folderId => folderPath.isEmpty ? null : folderPath.last.id;

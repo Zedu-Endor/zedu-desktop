@@ -13,6 +13,9 @@ class DmMessageComposer extends ConsumerStatefulWidget {
   final String recipientName;
   final String? hintText;
   final String channelId;
+
+  /// Where the draft is saved. Defaults to [channelId].
+  final String? draftKey;
   final List<DmParticipant> participants;
   final ValueChanged<String>? onSend;
   final bool isChannel;
@@ -22,6 +25,7 @@ class DmMessageComposer extends ConsumerStatefulWidget {
     required this.recipientName,
     this.hintText,
     required this.channelId,
+    this.draftKey,
     this.participants = const [],
     this.onSend,
     this.isChannel = false,
@@ -51,6 +55,10 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   bool _isPreviewPlaying = false;
   String? _editingMessageId;
 
+  /// What the composer held when edit mode started: an unsent reply that edit
+  /// mode must give back when it ends.
+  TextEditingValue? _textBeforeEdit;
+
   bool _isBold = false;
   bool _isItalic = false;
   bool _isStrikethrough = false;
@@ -61,8 +69,10 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   List<DmParticipant> _mentionSuggestions = [];
   String _mentionQuery = '';
 
-  /// channelId whose draft this composer instance is currently bound to.
+  /// Draft key this composer instance is currently bound to.
   String? _draftChannelId;
+
+  String get _draftKey => widget.draftKey ?? widget.channelId;
 
   Timer? _draftSaveDebounce;
 
@@ -81,7 +91,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     _drafts = ref.read(dmDraftStoreProvider);
     _controller = RichTextController();
     _controller.addListener(_onTextChanged);
-    _draftChannelId = widget.channelId;
+    _draftChannelId = _draftKey;
     _restoreDraft();
   }
 
@@ -92,9 +102,11 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     // the chat area stays mounted. Flush the debounced save for the previous
     // conversation (the listener may have saved already; this is a no-op then),
     // then swap to the new conversation and restore its draft if any.
-    if (oldWidget.channelId != widget.channelId) {
+    if (oldWidget.channelId != widget.channelId ||
+        oldWidget.draftKey != widget.draftKey) {
       _draftSaveDebounce?.cancel();
-      final previousChannel = _draftChannelId ?? oldWidget.channelId;
+      final previousChannel =
+          _draftChannelId ?? oldWidget.draftKey ?? oldWidget.channelId;
       final previousDrafts = _drafts;
       final wasEditing = _isEditMode;
 
@@ -113,7 +125,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         );
       }
       _drafts = ref.read(dmDraftStoreProvider);
-      _draftChannelId = widget.channelId;
+      _draftChannelId = _draftKey;
       _channelDeleted = false;
 
       setState(() {
@@ -121,6 +133,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         _showEmojiPicker = false;
         _isEditMode = false;
         _editingMessageId = null;
+        _textBeforeEdit = null;
       });
       _controller.clear();
       _restoreDraft();
@@ -137,9 +150,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         !_channelDeleted &&
         _controller.text.trim().isNotEmpty) {
       final drafts = _drafts;
-      final channelId = _draftChannelId ?? widget.channelId;
+      final draftKey = _draftChannelId ?? _draftKey;
       final text = _controller.text;
-      Future.microtask(() => drafts.save(channelId, text));
+      Future.microtask(() => drafts.save(draftKey, text));
     }
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
@@ -165,7 +178,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   }
 
   Future<void> _restoreDraft() async {
-    final entry = await _drafts.load(widget.channelId);
+    final entry = await _drafts.load(_draftKey);
     if (!mounted) return;
     if (entry == null || _controller.text.isNotEmpty) return;
 
@@ -186,7 +199,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     _draftSaveDebounce?.cancel();
     _draftSaveDebounce = Timer(const Duration(milliseconds: 250), () {
       if (!mounted) return;
-      _drafts.save(widget.channelId, text);
+      _drafts.save(_draftKey, text);
     });
   }
 
@@ -272,7 +285,11 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       ref
           .read(chatHistoryProvider(widget.channelId))
           .saveEdit(_editingMessageId!, text);
+      // An edit sends nothing new: the unsent reply and its draft come back,
+      // and a waiting voice note or file is kept.
       _exitEditMode();
+      _focusNode.requestFocus();
+      return;
     } else {
       ref
           .read(chatHistoryProvider(widget.channelId))
@@ -286,7 +303,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
 
     // The message is out, so the draft no longer exists.
     _draftSaveDebounce?.cancel();
-    _drafts.clear(widget.channelId);
+    _drafts.clear(_draftKey);
 
     _controller.clear();
     // Saving an edit sends nothing, so a waiting voice note or file is kept.
@@ -307,6 +324,13 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       _enterEditMode(messageId, content);
 
   void _enterEditMode(String messageId, String content) {
+    if (!_isEditMode) {
+      // Keep the unsent reply, and save it now in case the debounced save
+      // hasn't run yet: edit-mode text is never saved as a draft.
+      _textBeforeEdit = _controller.value;
+      _draftSaveDebounce?.cancel();
+      _drafts.save(widget.channelId, _controller.text);
+    }
     setState(() {
       _isEditMode = true;
       _editingMessageId = messageId;
@@ -318,11 +342,13 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
   }
 
   void _exitEditMode() {
+    final restored = _textBeforeEdit ?? TextEditingValue.empty;
+    _textBeforeEdit = null;
     setState(() {
       _isEditMode = false;
       _editingMessageId = null;
     });
-    _controller.clear();
+    _controller.value = restored;
     ref.read(chatHistoryProvider(widget.channelId)).cancelEditing();
   }
 
@@ -395,7 +421,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     if (key == LogicalKeyboardKey.keyV &&
         (HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed)) {
-      _handlePaste();
+      handlePaste();
       return KeyEventResult.ignored;
     }
 
@@ -743,6 +769,20 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     final validFiles = <XFile>[];
     for (final file in newFiles) {
       try {
+        if (file.path.isNotEmpty) {
+          final fileOnDisk = File(file.path);
+          if (!await fileOnDisk.exists()) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content:
+                      Text('File ${file.name} does not exist or is invalid.'),
+                ),
+              );
+            }
+            continue;
+          }
+        }
         final length = await file.length();
         if (length > 20 * 1024 * 1024) {
           if (mounted) {
@@ -754,7 +794,14 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         }
         validFiles.add(file);
       } catch (e) {
-        validFiles.add(file);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('File ${file.name} could not be attached: invalid file.'),
+            ),
+          );
+        }
       }
     }
     setState(() {
@@ -770,10 +817,20 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     if (result == null) return;
     final picked = result.files
         .where((PlatformFile f) => f.path != null)
-        .map(
-          (PlatformFile f) =>
-              XFile(f.path!, name: f.name, mimeType: f.extension),
-        )
+        .map((PlatformFile f) {
+      // Validate file path to prevent path traversal and invalid files
+      if (f.path == null ||
+          f.path!.contains('..') ||
+          f.path!.startsWith('/')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid file path: ${f.path}')),
+          );
+        }
+        return null;
+      }
+      return XFile(f.path!, name: f.name, mimeType: f.extension);
+    }).whereType<XFile>()
         .toList();
     await addFiles(picked);
   }
@@ -784,32 +841,103 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     );
   }
 
-  Future<void> _handlePaste() async {
-    final reader = await SystemClipboard.instance?.read();
-    if (reader == null || !reader.canProvide(Formats.png)) return;
+  Future<bool> handlePaste({DataReader? reader}) async {
+    final clipReader = reader ?? await SystemClipboard.instance?.read();
+    if (clipReader == null) return false;
 
-    reader.getFile(Formats.png, (file) async {
-      final stream = file.getStream();
-      final bytesBuilder = <int>[];
-      await for (final chunk in stream) {
-        bytesBuilder.addAll(chunk);
-      }
-      final bytes = Uint8List.fromList(bytesBuilder);
-      if (bytes.isNotEmpty) {
-        addFiles([
-          XFile.fromData(
-            bytes,
-            mimeType: 'image/png',
-            name: 'Pasted Image.png',
-          ),
-        ]);
-      }
-    });
+    SimpleFileFormat? matchedFormat;
+    String ext = 'png';
+    String mime = 'image/png';
+
+    if (clipReader.canProvide(Formats.png)) {
+      matchedFormat = Formats.png;
+      ext = 'png';
+      mime = 'image/png';
+    } else if (clipReader.canProvide(Formats.jpeg)) {
+      matchedFormat = Formats.jpeg;
+      ext = 'jpg';
+      mime = 'image/jpeg';
+    } else if (clipReader.canProvide(Formats.webp)) {
+      matchedFormat = Formats.webp;
+      ext = 'webp';
+      mime = 'image/webp';
+    } else if (clipReader.canProvide(Formats.gif)) {
+      matchedFormat = Formats.gif;
+      ext = 'gif';
+      mime = 'image/gif';
+    }
+
+    if (matchedFormat != null) {
+      final completer = Completer<bool>();
+      clipReader.getFile(
+        matchedFormat,
+        (file) async {
+          try {
+            final bytes = await file.readAll();
+            if (bytes.isNotEmpty) {
+              final fileName =
+                  'pasted_image_${DateTime.now().millisecondsSinceEpoch}.$ext';
+              try {
+                final tempPath =
+                    '${Directory.systemTemp.path}${Platform.pathSeparator}$fileName';
+                final tempFile = File(tempPath);
+                await tempFile.writeAsBytes(bytes);
+                await addFiles([
+                  XFile(tempPath, name: fileName, mimeType: mime),
+                ]);
+              } catch (_) {
+                await addFiles([
+                  XFile.fromData(bytes, name: fileName, mimeType: mime),
+                ]);
+              }
+            }
+            if (!completer.isCompleted) completer.complete(true);
+          } catch (_) {
+            if (!completer.isCompleted) completer.complete(false);
+          }
+        },
+        onError: (_) {
+          if (!completer.isCompleted) completer.complete(false);
+        },
+      );
+      return await completer.future;
+    }
+
+    if (clipReader.canProvide(Formats.fileUri)) {
+      clipReader.getValue(Formats.fileUri, (uri) async {
+        if (uri != null && uri.hasScheme && uri.scheme == 'file') {
+          final filePath = uri.toFilePath();
+          final fileExt = filePath.split('.').last.toLowerCase();
+          if (const [
+            'png',
+            'jpg',
+            'jpeg',
+            'webp',
+            'gif',
+            'bmp',
+          ].contains(fileExt)) {
+            final file = File(filePath);
+            if (await file.exists()) {
+              final fileName = filePath.split(Platform.pathSeparator).last;
+              await addFiles([XFile(filePath, name: fileName)]);
+            }
+          }
+        }
+      });
+      return true;
+    }
+
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final hasText = _controller.text.trim().isNotEmpty;
+    final isEditing = _isEditMode && _editingMessageId != null;
+    final hasSendableContent =
+        hasText ||
+        (!isEditing && (_pendingFiles.isNotEmpty || _voiceNote != null));
     // A user or org change replaces the store; follow it.
     ref.listen(dmDraftStoreProvider, (_, next) => _drafts = next);
     ref.listen(
@@ -1055,9 +1183,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
                         onTap: _handleSend,
                         child: Icon(
                           Icons.send_rounded,
-                          color: _controller.text.trim().isEmpty
-                              ? colors.textHint.withValues(alpha: 0.55)
-                              : colors.primary,
+                          color: hasSendableContent
+                              ? colors.primary
+                              : colors.textHint.withValues(alpha: 0.55),
                           size: 22,
                         ),
                       ),

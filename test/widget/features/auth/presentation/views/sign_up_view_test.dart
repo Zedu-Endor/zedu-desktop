@@ -19,6 +19,13 @@ class FakeAuthNotifier extends AuthNotifier {
   final void Function(String, String, String)? _onSignUp;
   final Future<void>? _pendingSignUp;
   int signUpCalls = 0;
+  int googleCalls = 0;
+
+  @override
+  Future<void> loginWithGoogle() async {
+    googleCalls++;
+    state = AuthState(status: AuthStatus.authenticated);
+  }
 
   @override
   AuthState build() => const AuthState(status: AuthStatus.unauthenticated);
@@ -97,7 +104,7 @@ void main() {
 
       expect(
         find.textContaining(
-          'By signing up, you agree to our terms of service',
+          'By signing up, you agree to our Terms of Service and Privacy Policy',
           findRichText: true,
         ),
         findsOneWidget,
@@ -149,6 +156,53 @@ void main() {
       },
     );
 
+    testWidgets('rejects a password that ends with a space', (tester) async {
+      final notifier = FakeAuthNotifier();
+      await pumpDesktopSignUp(tester, notifier);
+      await fillValidForm(tester);
+      await tester.enterText(find.byType(TextFormField).at(2), 'Record123 ');
+
+      await tester.ensureVisible(createAccountButton);
+      await tester.tap(createAccountButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text(Validators.passwordEdgeSpaceMessage), findsOneWidget);
+      expect(notifier.signUpCalls, 0);
+    });
+
+    testWidgets('does not count leading spaces towards the length', (
+      tester,
+    ) async {
+      final notifier = FakeAuthNotifier();
+      await pumpDesktopSignUp(tester, notifier);
+      await fillValidForm(tester);
+      await tester.enterText(find.byType(TextFormField).at(2), '       a');
+
+      await tester.ensureVisible(createAccountButton);
+      await tester.tap(createAccountButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text(Validators.passwordEdgeSpaceMessage), findsOneWidget);
+      expect(notifier.signUpCalls, 0);
+    });
+
+    testWidgets('sends the password exactly as typed', (tester) async {
+      String? sentPassword;
+      await pumpDesktopSignUp(
+        tester,
+        FakeAuthNotifier(onSignUp: (_, _, password) => sentPassword = password),
+      );
+      await fillValidForm(tester);
+      await tester.enterText(find.byType(TextFormField).at(2), 'Record 123');
+
+      await tester.ensureVisible(createAccountButton);
+      await tester.tap(createAccountButton);
+      await tester.pumpAndSettle();
+
+      expect(sentPassword, 'Record 123');
+      await drainToastTimer(tester);
+    });
+
     testWidgets('stays on the form when sign-up fails', (tester) async {
       await pumpDesktopSignUp(tester, FakeAuthNotifier(failSignUp: true));
       await fillValidForm(tester);
@@ -160,6 +214,22 @@ void main() {
       expect(find.text('HOME-STUB'), findsNothing);
       expect(find.text('Sign up failed'), findsOneWidget);
       expect(createAccountButton, findsOneWidget);
+      await drainToastTimer(tester);
+    });
+
+    testWidgets('"Sign up with Google" starts the Google flow', (tester) async {
+      final notifier = FakeAuthNotifier();
+      await pumpDesktopSignUp(tester, notifier);
+
+      final google = find.text('Sign up with Google');
+      await tester.ensureVisible(google);
+      await tester.tap(google);
+      await tester.pumpAndSettle();
+
+      expect(notifier.googleCalls, 1);
+      expect(find.text('Google sign up is not available yet.'), findsNothing);
+      // The Google account is signed in, so the user lands on home.
+      expect(find.text('HOME-STUB'), findsOneWidget);
       await drainToastTimer(tester);
     });
   });

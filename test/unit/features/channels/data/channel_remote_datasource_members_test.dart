@@ -25,6 +25,36 @@ void main() {
       datasource = ChannelRemoteDataSourceImpl(apiBaseService: mockApi);
     });
 
+    test(
+      'fetchChannelMembers maps people and skips those with no username',
+      () async {
+        when(
+          () => mockApi.get<Map<String, dynamic>>(
+            path: '/channels/c1/users',
+            queryParameters: {
+              'page': 1,
+              'limit': ChannelRemoteDataSourceImpl.memberPageSize,
+            },
+          ),
+        ).thenAnswer(
+          (_) async => ApiResponseModel<Map<String, dynamic>>(
+            data: {
+              'data': [
+                {'id': 'u1', 'username': 'ada', 'email': 'ada@zedu.chat'},
+                {'id': 'u2', 'username': '', 'email': 'blank@zedu.chat'},
+              ],
+            },
+            statusCode: 200,
+          ),
+        );
+
+        final members = await datasource.fetchChannelMembers('c1');
+
+        expect(members.map((m) => m.username), ['ada']);
+        expect(members.single.userId, 'u1');
+      },
+    );
+
     test('fetchOrganisationMemberIds reads every page of members', () async {
       const pageSize = ChannelRemoteDataSourceImpl.memberPageSize;
       final firstPage = List.generate(pageSize, (i) => 'u$i');

@@ -33,9 +33,16 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
   }
 
   void _startTimer() {
+    if (!mounted) return;
     setState(() => _secondsLeft = 300);
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Pop the view mid-countdown and a later tick would still fire; without
+      // this guard the callback calls setState() after dispose and crashes.
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_secondsLeft > 0) {
         setState(() => _secondsLeft--);
       } else {

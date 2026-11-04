@@ -15,37 +15,87 @@ class ChannelMessageList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final chatHistory = ref.watch(chatHistoryProvider(channelId));
+    final pendingMessages = chatHistory.messages
+        .where((m) =>
+            m['status'] != null &&
+            (m['channel_id'] == channelId || m['is_channel'] == true))
+        .map((m) => ChannelMessage(
+              id: m['id']?.toString(),
+              senderName: (m['sender_name'] as String?)?.isNotEmpty == true
+                  ? m['sender_name'] as String
+                  : chatHistory.currentUserName,
+              avatarUrl: (m['avatar_url'] as String?)?.isNotEmpty == true
+                  ? m['avatar_url'] as String
+                  : chatHistory.currentUserAvatarUrl,
+              text: m['content']?.toString() ?? '',
+              createdAt: DateTime.tryParse(
+                m['created_at']?.toString() ?? '',
+              )?.toLocal(),
+              status: m['status']?.toString(),
+            ))
+        .toList();
+
     return ref
         .watch(channelHistoryProvider(channelId))
         .when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) => Center(
-            child: TextButton(
-              onPressed: () =>
-                  ref.invalidate(channelHistoryProvider(channelId)),
-              child: const Text("Couldn't load messages. Retry"),
-            ),
-          ),
-          data: (messages) => messages.isEmpty
-              ? empty
-              : ListView.builder(
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
+          loading: () => pendingMessages.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : _buildList(context, ref, pendingMessages),
+          error: (_, _) => pendingMessages.isEmpty
+              ? Center(
+                  child: TextButton(
+                    onPressed: () =>
+                        ref.invalidate(channelHistoryProvider(channelId)),
+                    child: const Text("Couldn't load messages. Retry"),
                   ),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) =>
-                      ChannelMessageTile(message: messages[index]),
-                ),
+                )
+              : _buildList(context, ref, pendingMessages),
+          data: (serverMessages) {
+            final allMessages = [...pendingMessages, ...serverMessages];
+            return allMessages.isEmpty
+                ? empty
+                : _buildList(context, ref, allMessages);
+          },
         );
+  }
+
+  Widget _buildList(
+    BuildContext context,
+    WidgetRef ref,
+    List<ChannelMessage> messages,
+  ) {
+    return ListView.builder(
+      reverse: true,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 16,
+      ),
+      itemCount: messages.length,
+      itemBuilder: (context, index) {
+        final message = messages[index];
+        return ChannelMessageTile(
+          message: message,
+          onRetry: message.id != null
+              ? () => ref
+                  .read(chatHistoryProvider(channelId))
+                  .retryMessage(message.id!)
+              : null,
+        );
+      },
+    );
   }
 }
 
 class ChannelMessageTile extends StatelessWidget {
-  const ChannelMessageTile({super.key, required this.message});
+  const ChannelMessageTile({
+    super.key,
+    required this.message,
+    this.onRetry,
+  });
 
   final ChannelMessage message;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +106,7 @@ class ChannelMessageTile extends StatelessWidget {
     final initial = trimmedName.isNotEmpty
         ? trimmedName.characters.first.toUpperCase()
         : '?';
+    final status = message.status;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -97,10 +148,48 @@ class ChannelMessageTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                SelectableText(
-                  message.text,
-                  style: TextStyle(fontSize: 15, color: colors.textPrimary),
+                MessageLinkScope(
+                  builder: (context, links) => SelectableText.rich(
+                    links.span(
+                      message.text,
+                      TextStyle(fontSize: 15, color: colors.textPrimary),
+                    ),
+                  ),
                 ),
+                if (status != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: status == 'failed'
+                        ? GestureDetector(
+                            onTap: onRetry,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 13,
+                                  color: colors.error,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Failed – Tap to retry',
+                                  style: TextStyle(
+                                    color: colors.error,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Text(
+                            status == 'sending' ? 'Sending...' : '',
+                            style: TextStyle(
+                              color: colors.textHint,
+                              fontSize: 11,
+                            ),
+                          ),
+                  ),
               ],
             ),
           ),

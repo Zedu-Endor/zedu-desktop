@@ -56,9 +56,9 @@ class _CreditsPaymentDeepLinkListenerState
     if (sessionId == null || sessionId == _lastProcessedSessionId) return;
     _lastProcessedSessionId = sessionId;
 
-    final user = ref.read(authNotifierProvider).user;
-    final orgId = user?.currentOrg;
-    if (orgId == null || orgId.isEmpty) return;
+    // The purchase was made for the workspace selected in the sidebar.
+    final orgId = ref.read(creditsOrgIdProvider);
+    if (orgId.isEmpty) return;
 
     AppLogger.i('Verifying credit payment session', tag: _tag);
     final verified = await ref

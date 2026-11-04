@@ -100,6 +100,7 @@ void main() {
             authNotifierProvider.overrideWith(
               () => FakeDeepLinkAuthNotifier(user: user),
             ),
+            currentOrgIdProvider.overrideWithValue(''),
             creditsNotifierProvider.overrideWith(
               () => FakeDeepLinkCreditsNotifier(verified: verified),
             ),
@@ -132,9 +133,11 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('a payment link is verified against the selected org', (
-      tester,
-    ) async {
+    /// Opens a payment link and returns the (session, org) it was verified for.
+    Future<(String?, String?)> verifyLink(
+      WidgetTester tester, {
+      required String selectedOrg,
+    }) async {
       String? verifiedSession;
       String? verifiedOrg;
 
@@ -166,6 +169,7 @@ void main() {
             authNotifierProvider.overrideWith(
               () => FakeDeepLinkAuthNotifier(user: _user(currentOrg: 'org-9')),
             ),
+            currentOrgIdProvider.overrideWithValue(selectedOrg),
             creditsNotifierProvider.overrideWith(
               () => _SpyCreditsNotifier(
                 onVerify: (sessionId, orgId) {
@@ -189,8 +193,25 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
 
-      expect(verifiedSession, 'cs-2');
-      expect(verifiedOrg, 'org-9');
+      return (verifiedSession, verifiedOrg);
+    }
+
+    testWidgets('a payment link is verified against the selected workspace', (
+      tester,
+    ) async {
+      final (session, org) = await verifyLink(tester, selectedOrg: 'org-ws');
+
+      expect(session, 'cs-2');
+      expect(org, 'org-ws');
+    });
+
+    testWidgets('falls back to the sign-in org when no workspace is selected', (
+      tester,
+    ) async {
+      final (session, org) = await verifyLink(tester, selectedOrg: '');
+
+      expect(session, 'cs-2');
+      expect(org, 'org-9');
     });
   });
 }

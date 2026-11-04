@@ -7,7 +7,8 @@ abstract interface class CreditsRemoteDataSource {
   Future<CreditUsageReportModel> getUsageReport(String orgId);
   Future<List<CreditTransactionModel>> getTransactions(String orgId);
   Future<CreditCheckoutModel> purchaseCredits({
-    required String planId,
+    String? packageId,
+    String? planId,
     required String email,
   });
   Future<void> verifyPayment({required String sessionId});
@@ -89,11 +90,13 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
 
   @override
   Future<CreditCheckoutModel> purchaseCredits({
-    required String planId,
+    String? packageId,
+    String? planId,
     required String email,
   }) async {
+    final effectivePackageId = packageId ?? planId ?? '';
     if (_config.usesMockData) {
-      final sessionId = 'cs_test_mock_${planId.hashCode.abs()}';
+      final sessionId = 'cs_test_mock_${effectivePackageId.hashCode.abs()}';
       return CreditCheckoutModel(
         checkoutSessionId: sessionId,
         checkoutSessionUrl:
@@ -102,11 +105,21 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
     }
     final response = await _api.post<Map<String, dynamic>>(
       path: '/credits/purchase',
-      data: {'plan_id': planId, 'email': email},
+      headers: {'Referer': _config.apiBaseUrl},
+      data: {
+        'package_id': effectivePackageId,
+        'plan_id': effectivePackageId,
+        'email': email,
+      },
     );
-    return CreditCheckoutModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
-    );
+    final data = response.data['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ApiFailure(
+        message: 'Invalid credit checkout response',
+        kind: ApiFailureKind.parsing,
+      );
+    }
+    return CreditCheckoutModel.fromJson(data);
   }
 
   @override

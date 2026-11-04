@@ -363,6 +363,54 @@ void main() {
       'created_at': '2026-10-17T08:00:00Z',
     };
 
+    Future<void> searchFor(WidgetTester tester, String query) async {
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Search in conversation'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        ),
+        query,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Finder searchResult(String text) =>
+        find.descendant(of: find.byType(ListTile), matching: find.text(text));
+
+    testWidgets('search shows results without HTML tags', (tester) async {
+      await pumpChat(tester, [
+        message('m1', '<p>hello <strong>team</strong></p>'),
+      ]);
+
+      await searchFor(tester, 'team');
+
+      expect(searchResult('hello team'), findsOneWidget);
+    });
+
+    testWidgets('search does not match tag names', (tester) async {
+      await pumpChat(tester, [
+        message('m1', '<p>hello <strong>team</strong></p>'),
+      ]);
+
+      await searchFor(tester, 'strong');
+
+      expect(find.byType(ListTile), findsNothing);
+    });
+
+    testWidgets('search finds and shows decoded special characters', (
+      tester,
+    ) async {
+      await pumpChat(tester, [message('m1', '<p>Tom &amp; Jerry &lt;3</p>')]);
+
+      await searchFor(tester, 'tom & jerry');
+
+      expect(searchResult('Tom & Jerry <3'), findsOneWidget);
+    });
+
     testWidgets('opens the message menu on long press', (tester) async {
       await pumpChat(tester, [ownMessage('m1', 'my message')]);
 
@@ -400,6 +448,40 @@ void main() {
       await pumpChat(tester, [message('m1', 'hello there')]);
 
       expect(find.text('hello there', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('opens a URL in a message when it is tapped', (tester) async {
+      final opened = <Uri>[];
+      final original = messageLinkLauncher;
+      messageLinkLauncher = (uri) async {
+        opened.add(uri);
+        return true;
+      };
+      addTearDown(() => messageLinkLauncher = original);
+
+      await pumpChat(tester, [message('m1', 'https://example.com/dm')]);
+      await tester.tap(find.text('https://example.com/dm', findRichText: true));
+      await tester.pump();
+
+      expect(opened, [Uri.parse('https://example.com/dm')]);
+    });
+
+    testWidgets('opens a URL inside bold text', (tester) async {
+      final opened = <Uri>[];
+      final original = messageLinkLauncher;
+      messageLinkLauncher = (uri) async {
+        opened.add(uri);
+        return true;
+      };
+      addTearDown(() => messageLinkLauncher = original);
+
+      await pumpChat(tester, [message('m1', '**https://example.com/bold**')]);
+      await tester.tap(
+        find.text('https://example.com/bold', findRichText: true),
+      );
+      await tester.pump();
+
+      expect(opened, [Uri.parse('https://example.com/bold')]);
     });
 
     Finder bubbleDividers(String text) => find.descendant(

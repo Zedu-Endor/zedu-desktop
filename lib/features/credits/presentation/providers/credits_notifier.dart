@@ -14,8 +14,16 @@ class CreditsNotifier extends Notifier<CreditsState> {
 
   Future<void> load({String? orgId}) async {
     if (orgId == null || orgId.isEmpty) return;
+    // Another organisation's usage and history must not show for this one.
+    if (state.orgId != orgId) {
+      state = CreditsState(
+        packages: state.packages,
+        lastVerifiedSessionId: state.lastVerifiedSessionId,
+      );
+    }
     state = state.copyWith(
       status: CreditsStatus.loading,
+      orgId: orgId,
       clearError: true,
       clearSuccess: true,
     );
@@ -24,6 +32,8 @@ class CreditsNotifier extends Notifier<CreditsState> {
     final usageResult = await _repository.getUsage(orgId);
     final reportResult = await _repository.getUsageReport(orgId);
     final transactionsResult = await _repository.getTransactions(orgId);
+    // A load for another organisation started meanwhile; its result wins.
+    if (state.orgId != orgId) return;
 
     String? error;
     var packages = state.packages;
@@ -82,6 +92,7 @@ class CreditsNotifier extends Notifier<CreditsState> {
     );
 
     final result = await _repository.purchaseCredits(
+      packageId: package.id,
       planId: package.id,
       email: email,
     );

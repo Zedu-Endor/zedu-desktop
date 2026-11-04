@@ -36,6 +36,9 @@ class SecureStorageService {
 
   Future<void> deleteValue(String key) => _storage.delete(key: key);
 
+  /// Every stored key and value, for removing a group of keys by prefix.
+  Future<Map<String, String>> readAll() => _storage.readAll();
+
   Future<void> clearAll() async {
     _sessionToken = null;
     await _storage.deleteAll();

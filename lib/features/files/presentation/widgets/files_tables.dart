@@ -178,7 +178,7 @@ class FoldersTable extends StatelessWidget {
         _Column('Name', 5),
         _Column('Owner', 2, compact: false),
         _Column('Date Created', 2),
-        _Column('Size', 1),
+        _Column('Items', 1),
       ],
       rowCount: folders.length,
       onTapRow: (r) => onOpen(folders[r]),

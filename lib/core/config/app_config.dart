@@ -12,12 +12,16 @@ import 'package:zedu/core/core.dart';
 const String kDefaultDesktopGoogleClientId =
     '764182056638-08g88e196e643mhpa2tuv5dpr7iumd1j.apps.googleusercontent.com';
 
+/// The website's Contact Sales page, opened from the Enterprise plan.
+const String kDefaultContactSalesUrl = 'https://zedu.chat/contact-sales';
+
 class AppConfig {
   const AppConfig({
     required this.apiBaseUrl,
     required this.usesMockData,
     this.googleClientId = kDefaultDesktopGoogleClientId,
     this.googleClientSecret = '',
+    this.contactSalesUrl = kDefaultContactSalesUrl,
   });
 
   /// Resolves config after [loadAppEnv] has run in [main] (root `.env` /
@@ -79,6 +83,7 @@ class AppConfig {
   final bool usesMockData;
   final String googleClientId;
   final String googleClientSecret;
+  final String contactSalesUrl;
 }
 
 bool _parseBool(String raw, {required bool defaultValue}) {

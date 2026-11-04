@@ -29,4 +29,33 @@ void main() {
     expect(message.avatarUrl, 'https://cdn.zedu.chat/default.png');
     expect(message.text, 'Hi & welcome\nLine two\na\nb');
   });
+
+  group('ChannelMessage.fromJson decodes HTML entities', () {
+    String textOf(String html) =>
+        ChannelMessage.fromJson({'message': html}).text;
+
+    test('shows the characters the web editor escapes', () {
+      expect(textOf('<p>if a &lt; b and b &gt; c</p>'), 'if a < b and b > c');
+      expect(textOf('<p>I &lt;3 this</p>'), 'I <3 this');
+      expect(
+        textOf('<p>&quot;quoted&quot; &apos;text&apos;</p>'),
+        '"quoted" \'text\'',
+      );
+    });
+
+    test('decodes numeric entities', () {
+      expect(textOf('it&#39;s &#x27;ok&#X27; &#128512;'), "it's 'ok' 😀");
+    });
+
+    test('decodes once, so an escaped entity stays as typed', () {
+      expect(textOf('<p>type &amp;lt; for &lt;</p>'), 'type &lt; for <');
+    });
+
+    test('leaves anything that is not a valid entity alone', () {
+      expect(
+        textOf('AT&T &bogus; &#xFFFFFFF; &#xD800; &lt'),
+        'AT&T &bogus; &#xFFFFFFF; &#xD800; &lt',
+      );
+    });
+  });
 }

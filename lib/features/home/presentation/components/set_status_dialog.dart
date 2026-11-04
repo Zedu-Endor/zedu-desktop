@@ -41,6 +41,13 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
     final current = ref.read(authNotifierProvider).user?.status;
     _textCtrl = TextEditingController(text: current?.text ?? '');
     _selectedEmoji = current?.emoji;
+    _pauseNotifications = current?.pauseNotifications ?? false;
+    // A status saved with "Don't remove" is the only one without an expiry.
+    if (current != null &&
+        current.hasCustomStatus &&
+        current.expiresAt == null) {
+      _timeout = StatusTimeout.dontRemove;
+    }
   }
 
   @override

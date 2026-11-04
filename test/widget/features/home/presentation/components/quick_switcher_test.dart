@@ -124,5 +124,99 @@ void main() {
 
       expect(selected.single.conversation?.username, 'Gideon');
     });
+
+    group('with more rows than fit', () {
+      final manyEntries = [
+        for (var i = 0; i < 30; i++) QuickSwitcherEntry.channel('channel-$i'),
+      ];
+
+      Future<List<QuickSwitcherEntry>> pumpLongDialog(
+        WidgetTester tester,
+      ) async {
+        final selected = <QuickSwitcherEntry>[];
+        await tester.pumpWidget(
+          buildTestMaterialApp(
+            Scaffold(
+              body: QuickSwitcherDialog(
+                entries: manyEntries,
+                onSelected: selected.add,
+              ),
+            ),
+          ),
+        );
+        return selected;
+      }
+
+      Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
+        await tester.sendKeyEvent(key);
+        await tester.pump();
+        await tester.pump();
+      }
+
+      void expectFullyVisible(WidgetTester tester, String label) {
+        final list = tester.getRect(find.byType(ListView));
+        final row = find.text(label);
+
+        expect(row, findsOneWidget);
+        expect(tester.getTopLeft(row).dy, greaterThanOrEqualTo(list.top));
+        expect(tester.getBottomLeft(row).dy, lessThanOrEqualTo(list.bottom));
+      }
+
+      testWidgets('arrow down keeps the highlighted row in view', (
+        tester,
+      ) async {
+        final selected = await pumpLongDialog(tester);
+
+        for (var i = 1; i <= 20; i++) {
+          await press(tester, LogicalKeyboardKey.arrowDown);
+          expectFullyVisible(tester, 'channel-$i');
+        }
+
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+        expect(selected.single.label, 'channel-20');
+      });
+
+      testWidgets('arrow up scrolls back to the highlighted row', (
+        tester,
+      ) async {
+        await pumpLongDialog(tester);
+
+        for (var i = 0; i < 20; i++) {
+          await press(tester, LogicalKeyboardKey.arrowDown);
+        }
+        for (var i = 19; i >= 0; i--) {
+          await press(tester, LogicalKeyboardKey.arrowUp);
+          expectFullyVisible(tester, 'channel-$i');
+        }
+      });
+
+      testWidgets('wrapping around shows the last and then the first row', (
+        tester,
+      ) async {
+        await pumpLongDialog(tester);
+
+        await press(tester, LogicalKeyboardKey.arrowUp);
+        expectFullyVisible(tester, 'channel-29');
+
+        await press(tester, LogicalKeyboardKey.arrowDown);
+        expectFullyVisible(tester, 'channel-0');
+      });
+
+      testWidgets('typing shows the first match after scrolling', (
+        tester,
+      ) async {
+        await pumpLongDialog(tester);
+
+        for (var i = 0; i < 20; i++) {
+          await press(tester, LogicalKeyboardKey.arrowDown);
+        }
+        await tester.enterText(find.byType(TextField), 'channel');
+        await tester.pump();
+        await tester.pump();
+
+        expectFullyVisible(tester, 'channel-0');
+      });
+    });
   });
 }

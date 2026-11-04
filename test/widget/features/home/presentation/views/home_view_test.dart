@@ -15,6 +15,26 @@ class _EmptyChannelRepository extends Mock implements ChannelRepository {
   @override
   Future<Result<List<ChannelMessage>>> fetchChannelMessages(String id) async =>
       const Success(<ChannelMessage>[]);
+
+  @override
+  Future<Result<List<DmParticipant>>> fetchChannelMembers(String id) async =>
+      Success([
+        DmParticipant(userId: 'u1', username: 'ada', email: 'ada@zedu.chat'),
+      ]);
+}
+
+/// Records leave calls and answers with [leaveResult].
+class _LeavingChannelRepository extends _EmptyChannelRepository {
+  _LeavingChannelRepository(this.leaveResult);
+
+  final Result<void> leaveResult;
+  final left = <String>[];
+
+  @override
+  Future<Result<void>> leaveChannel(String channelId) async {
+    left.add(channelId);
+    return leaveResult;
+  }
 }
 
 class FakeSecureStorageService extends Fake implements SecureStorageService {
@@ -65,6 +85,7 @@ void main() {
       WidgetTester tester, {
       ChannelNotifier Function() channels = _FakeChannelNotifier.new,
       double width = 1600,
+      ChannelRepository? repository,
     }) async {
       tester.view.physicalSize = Size(width, 1000);
       tester.view.devicePixelRatio = 1;
@@ -77,7 +98,7 @@ void main() {
             channelProvider.overrideWith(channels),
             workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
             channelRepositoryProvider.overrideWithValue(
-              _EmptyChannelRepository(),
+              repository ?? _EmptyChannelRepository(),
             ),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(
@@ -143,6 +164,18 @@ void main() {
       expect(find.text('# random'), findsNothing);
     });
 
+    testWidgets('the channel composer gets the channel members to mention', (
+      tester,
+    ) async {
+      await pumpSidebarAndChat(tester);
+
+      final composer = tester.widget<DmMessageComposer>(
+        find.byType(DmMessageComposer),
+      );
+      expect(composer.isChannel, isTrue);
+      expect(composer.participants.map((p) => p.username), ['ada']);
+    });
+
     testWidgets('a very long channel name does not overflow', (tester) async {
       await pumpSidebarAndChat(
         tester,
@@ -156,6 +189,63 @@ void main() {
       // The name shows in the sidebar row and in the chat header.
       expect(find.text('# $_longName'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    Future<void> leaveRandom(WidgetTester tester) async {
+      await tester.tap(find.text('random'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('channel-header-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Leave channel'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('leaving a channel removes it and opens another one', (
+      tester,
+    ) async {
+      final repository = _LeavingChannelRepository(const Success(null));
+      await pumpSidebarAndChat(tester, repository: repository);
+
+      await leaveRandom(tester);
+      expect(find.text('Leave #random?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Leave'));
+      await tester.pumpAndSettle();
+
+      expect(repository.left, ['channel-random']);
+      expect(find.text('random'), findsNothing);
+      expect(find.text('# general'), findsOneWidget);
+      expect(find.text('You left #random'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('cancelling the dialog keeps the channel', (tester) async {
+      final repository = _LeavingChannelRepository(const Success(null));
+      await pumpSidebarAndChat(tester, repository: repository);
+
+      await leaveRandom(tester);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(repository.left, isEmpty);
+      expect(find.text('# random'), findsOneWidget);
+    });
+
+    testWidgets('a failed leave shows the error and keeps the channel', (
+      tester,
+    ) async {
+      final repository = _LeavingChannelRepository(
+        const Failure(ApiFailure(message: 'You cannot leave this channel')),
+      );
+      await pumpSidebarAndChat(tester, repository: repository);
+
+      await leaveRandom(tester);
+      await tester.tap(find.widgetWithText(TextButton, 'Leave'));
+      await tester.pumpAndSettle();
+
+      expect(repository.left, ['channel-random']);
+      expect(find.text('You cannot leave this channel'), findsOneWidget);
+      expect(find.text('# random'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
     });
   });
 

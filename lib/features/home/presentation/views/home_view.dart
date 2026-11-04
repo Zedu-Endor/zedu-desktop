@@ -13,15 +13,22 @@ class _HomeViewState extends ConsumerState<HomeView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final orgId = ref.read(authNotifierProvider).user?.currentOrg;
-      if (orgId != null && orgId.isNotEmpty) {
-        ref.read(creditsNotifierProvider.notifier).load(orgId: orgId);
-      }
+      _loadCredits(ref.read(creditsOrgIdProvider));
     });
+  }
+
+  void _loadCredits(String orgId) {
+    if (orgId.isEmpty) return;
+    ref.read(creditsNotifierProvider.notifier).load(orgId: orgId);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Switching workspace reloads its credits, so the balance in the user
+    // menu belongs to the workspace on screen.
+    ref.listen<String>(creditsOrgIdProvider, (previous, next) {
+      if (previous != next) _loadCredits(next);
+    });
     final colors = context.colors;
     final showProfile = ref.watch(personalProfilePanelProvider);
 
@@ -129,6 +136,9 @@ class _MainSidebarSwitcher extends ConsumerWidget {
     if (state == HomeSidebarType.dms) {
       return const DmSidebarList();
     }
+    if (state == HomeSidebarType.people) {
+      return const PeopleSidebar();
+    }
     if (state == HomeSidebarType.files) {
       return const FilesSidebar();
     }
@@ -145,23 +155,28 @@ class _ChatAreaSwitcher extends ConsumerWidget {
     final selectedDm = ref.watch(selectedDmProvider);
     final activeChat = ref.watch(activeChatProvider);
 
-    void leaveNewGroupChat() {
-      if (ref.read(activeChatProvider).type == ActiveChatType.newGroupChat) {
+    void leaveFullPage() {
+      final type = ref.read(activeChatProvider).type;
+      if (type == ActiveChatType.newGroupChat ||
+          type == ActiveChatType.channelDirectory) {
         ref.read(activeChatProvider.notifier).selectChannel('general');
       }
     }
 
-    // Close the New Group Chat page when the user switches sidebar tab or
-    // opens a conversation.
+    // Close the New Group Chat and Channel Directory pages when the user
+    // switches sidebar tab or opens a conversation.
     ref.listen(homeSidebarProvider, (previous, next) {
-      if (previous != next) leaveNewGroupChat();
+      if (previous != next) leaveFullPage();
     });
     ref.listen(selectedDmProvider, (previous, next) {
-      if (next != null) leaveNewGroupChat();
+      if (next != null) leaveFullPage();
     });
 
     if (activeChat.type == ActiveChatType.newGroupChat) {
       return const NewGroupChatView();
+    }
+    if (activeChat.type == ActiveChatType.channelDirectory) {
+      return const ChannelDirectoryView();
     }
 
     if (state == HomeSidebarType.dms) {
@@ -170,6 +185,9 @@ class _ChatAreaSwitcher extends ConsumerWidget {
       } else {
         return const DmEmptyState();
       }
+    }
+    if (state == HomeSidebarType.people) {
+      return const PeopleView();
     }
     if (state == HomeSidebarType.files) {
       return const FilesView();
@@ -211,32 +229,44 @@ class _MainSidebar extends ConsumerWidget {
           const SidebarChannelList(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border.all(
+            child: Material(
+              color: colors.onPrimary.withValues(alpha: 0.05),
+              shape: RoundedRectangleBorder(
+                side: BorderSide(
                   color: colors.onPrimary.withValues(alpha: 0.24),
                 ),
                 borderRadius: BorderRadius.circular(6),
-                color: colors.onPrimary.withValues(alpha: 0.05),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'View all channels',
-                      style: TextStyle(
-                        color: colors.onPrimary.withValues(alpha: 0.7),
-                        fontSize: 13,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                hoverColor: colors.onPrimary.withValues(alpha: 0.1),
+                onTap: () => ref
+                    .read(activeChatProvider.notifier)
+                    .selectChannelDirectory(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'View all channels',
+                          style: TextStyle(
+                            color: colors.onPrimary.withValues(alpha: 0.7),
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
-                    ),
+                      Icon(
+                        Icons.chevron_right,
+                        color: colors.onPrimary.withValues(alpha: 0.7),
+                        size: 16,
+                      ),
+                    ],
                   ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: colors.onPrimary.withValues(alpha: 0.7),
-                    size: 16,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -326,6 +356,11 @@ class HomeChatArea extends ConsumerWidget {
 
     final channelId = selected?.id ?? '';
     final welcome = _buildWelcomeScreen(context, channelName);
+    // Until these load, or if loading fails, the composer simply suggests nobody.
+    final members = channelId.isEmpty
+        ? const <DmParticipant>[]
+        : ref.watch(channelMembersProvider(channelId)).value ??
+              const <DmParticipant>[];
 
     if (channelId.isNotEmpty) {
       // The composer sends through the chat history; reload the list once a
@@ -345,7 +380,7 @@ class HomeChatArea extends ConsumerWidget {
 
     return Column(
       children: [
-        _buildChatHeader(context, channelName),
+        _buildChatHeader(context, channelName, selected),
         Expanded(
           child: channelId.isEmpty
               ? welcome
@@ -359,13 +394,18 @@ class HomeChatArea extends ConsumerWidget {
           key: ValueKey(selected?.id ?? channelName),
           recipientName: '#$channelName',
           channelId: selected?.id ?? '',
+          participants: members,
           isChannel: true,
         ),
       ],
     );
   }
 
-  Widget _buildChatHeader(BuildContext context, String channelName) {
+  Widget _buildChatHeader(
+    BuildContext context,
+    String channelName,
+    Channel? channel,
+  ) {
     final colors = context.colors;
 
     return Container(
@@ -396,7 +436,10 @@ class HomeChatArea extends ConsumerWidget {
             child: Icon(Icons.person, size: 18, color: colors.onPrimary),
           ),
           const SizedBox(width: 8),
-          Icon(Icons.more_vert, color: colors.textHint),
+          if (channel == null)
+            Icon(Icons.more_vert, color: colors.textHint)
+          else
+            _ChannelHeaderMenu(channel: channel),
         ],
       ),
     );
@@ -430,6 +473,97 @@ class HomeChatArea extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// The channel header's "more" menu.
+class _ChannelHeaderMenu extends ConsumerWidget {
+  final Channel channel;
+
+  const _ChannelHeaderMenu({required this.channel});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
+
+    return PopupMenuButton<String>(
+      key: const ValueKey('channel-header-menu'),
+      tooltip: 'Channel options',
+      position: PopupMenuPosition.under,
+      icon: Icon(Icons.more_vert, color: colors.textHint),
+      onSelected: (value) {
+        if (value == 'leave') _confirmLeave(context, ref);
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'leave',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 18, color: colors.error),
+              const SizedBox(width: 12),
+              Text('Leave channel', style: TextStyle(color: colors.error)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmLeave(BuildContext context, WidgetRef ref) async {
+    final colors = context.colors;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Leave #${channel.name}?'),
+        content: Text(
+          channel.isPrivate
+              ? 'You will stop getting its messages, and someone will need to '
+                    'add you again to rejoin.'
+              : 'You will stop getting its messages. You can join it again '
+                    'from the channel directory.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Leave', style: TextStyle(color: colors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final result = await ref
+        .read(channelProvider.notifier)
+        .leaveChannel(channel.id);
+
+    switch (result) {
+      case Success<void>():
+        // Open another channel so the header never shows one we left.
+        final remaining = ref.read(channelProvider).value ?? const <Channel>[];
+        ref
+            .read(activeChatProvider.notifier)
+            .selectChannel(
+              remaining.isEmpty ? 'general' : remaining.first.name,
+            );
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.success,
+          message: 'You left #${channel.name}',
+        );
+      case Failure<void>(:final error):
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.error,
+          message: error.message.isEmpty
+              ? 'Could not leave #${channel.name}'
+              : error.message,
+        );
+    }
   }
 }
 

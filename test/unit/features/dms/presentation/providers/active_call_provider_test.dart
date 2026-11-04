@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -9,9 +11,13 @@ class FakeBuzzRepository extends BuzzRepository {
   final String buzzId;
   final String token;
   final List<(String, bool)> directCallResponses = <(String, bool)>[];
+  Completer<Map<String, dynamic>>? pendingInitiateCall;
 
   @override
   Future<Map<String, dynamic>> initiateDirectCall(String participantId) async {
+    if (pendingInitiateCall != null) {
+      return pendingInitiateCall!.future;
+    }
     return <String, dynamic>{
       'success': true,
       'buzzId': buzzId,
@@ -138,6 +144,38 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 350));
         expect(notifier.state.status, CallStatus.none);
         expect(repository.directCallResponses, contains(('buzz-123', false)));
+      },
+    );
+
+    test(
+      'does not throw or leak subscriptions when disposed during initiateCall (#2572)',
+      () async {
+        repository.pendingInitiateCall = Completer<Map<String, dynamic>>();
+        final notifier = container.read(activeCallProvider);
+
+        final future = notifier.initiateCall(
+          remoteUserId: 'user-2',
+          remoteUserName: 'Bob',
+          channelId: 'dm-1',
+        );
+
+        expect(notifier.state.status, CallStatus.calling);
+
+        // Dispose while initiateCall is waiting on initiateDirectCall
+        notifier.dispose();
+        expect(notifier.isDisposed, isTrue);
+
+        // Resolve the async network call
+        repository.pendingInitiateCall!.complete(<String, dynamic>{
+          'success': true,
+          'buzzId': 'buzz-123',
+          'token': 'token-abc',
+          'channelName': 'channel-user-2',
+        });
+
+        await expectLater(future, completes);
+        // Verify state is not modified and buzzId is not populated after disposal
+        expect(notifier.state.buzzId, isNull);
       },
     );
   });

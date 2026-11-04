@@ -40,6 +40,18 @@ class FakeAuthNotifier extends AuthNotifier {
   Future<void> logout() async {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
+
+  int retryCount = 0;
+
+  @override
+  Future<void> retrySessionRestore() async {
+    retryCount++;
+  }
+
+  @override
+  void showLoginForm() {
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
 }
 
 Widget buildLoginViewUnderTest({FakeAuthNotifier? notifier}) {
@@ -137,6 +149,25 @@ void main() {
       ]);
     });
 
+    testWidgets('sends the password exactly as typed', (tester) async {
+      final attempts = <(String, String)>[];
+      await pumpDesktopLogin(
+        tester,
+        FakeAuthNotifier(
+          onLogin: (email, password) => attempts.add((email, password)),
+        ),
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        ' user@example.com ',
+      );
+      await tester.enterText(find.byType(TextFormField).at(1), ' Secret123 ');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(attempts, [('user@example.com', ' Secret123 ')]);
+    });
+
     testWidgets(
       'Enter does not submit while authentication is already loading',
       (tester) async {
@@ -220,6 +251,53 @@ void main() {
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Login to Zedu'), findsNothing);
+    });
+
+    group('when the saved session could not be checked', () {
+      const failedRestore = AuthState(
+        status: AuthStatus.unauthenticated,
+        error: 'No connection',
+        sessionRestoreFailed: true,
+      );
+
+      testWidgets('shows the retry screen instead of the form', (tester) async {
+        await tester.pumpWidget(
+          buildLoginViewUnderTest(
+            notifier: FakeAuthNotifier(initial: failedRestore),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text("Can't reach Zedu"), findsOneWidget);
+        expect(find.text('No connection'), findsOneWidget);
+        expect(find.text('Login to Zedu'), findsNothing);
+      });
+
+      testWidgets('Retry tries the saved session again', (tester) async {
+        final notifier = FakeAuthNotifier(initial: failedRestore);
+        await tester.pumpWidget(buildLoginViewUnderTest(notifier: notifier));
+        await tester.pump();
+
+        await tester.tap(find.text('Retry'));
+        await tester.pump();
+
+        expect(notifier.retryCount, 1);
+      });
+
+      testWidgets('the login form is still available', (tester) async {
+        await tester.pumpWidget(
+          buildLoginViewUnderTest(
+            notifier: FakeAuthNotifier(initial: failedRestore),
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(find.text('Log in with a password instead'));
+        await tester.pump();
+
+        expect(find.text("Can't reach Zedu"), findsNothing);
+        expect(find.text('Login to Zedu'), findsOneWidget);
+      });
     });
 
     testWidgets('shows validation errors when submitting empty form', (
