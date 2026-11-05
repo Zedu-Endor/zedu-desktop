@@ -56,6 +56,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
 
   List<XFile> _pendingFiles = [];
 
+  @visibleForTesting
+  List<XFile> get pendingFiles => List.unmodifiable(_pendingFiles);
+
   List<DmParticipant> _mentionSuggestions = [];
   String _mentionQuery = '';
 
@@ -763,12 +766,13 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       type: FileType.any,
     );
     if (result == null) return;
+    // The paths come from the system file dialog, so they are taken as they
+    // are: on macOS and Linux every one of them starts with '/'. The MIME type
+    // is left unset because the upload works it out from the file name;
+    // `f.extension` is a bare extension such as `pdf`, not a MIME type.
     final picked = result.files
         .where((PlatformFile f) => f.path != null)
-        .map(
-          (PlatformFile f) =>
-              XFile(f.path!, name: f.name, mimeType: f.extension),
-        )
+        .map((PlatformFile f) => XFile(f.path!, name: f.name))
         .toList();
     await addFiles(picked);
   }
