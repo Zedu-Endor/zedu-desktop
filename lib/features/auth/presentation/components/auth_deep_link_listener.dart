@@ -16,7 +16,11 @@ class AuthDeepLinkListener extends ConsumerStatefulWidget {
 class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
-  String? _lastProcessedToken;
+  // The token whose verification is running right now, and the last token
+  // that signed the user in. Either one is ignored if it is delivered again;
+  // a token whose verification failed can be tapped again to retry.
+  String? _inFlightToken;
+  String? _verifiedToken;
 
   static const _tag = 'AuthDeepLinkListener';
 
@@ -49,20 +53,31 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
 
   Future<void> _handleUri(Uri uri) async {
     final token = MagicLinkDeepLinkParser.extractToken(uri);
-    if (token == null || token == _lastProcessedToken) return;
-    _lastProcessedToken = token;
+    if (token == null || token == _inFlightToken || token == _verifiedToken) {
+      return;
+    }
+    _inFlightToken = token;
 
     AppLogger.i('Processing magic link deep link', tag: _tag);
-    await ref.read(authNotifierProvider.notifier).verifyMagicLink(token: token);
+    final auth = ref.read(authNotifierProvider.notifier);
+    try {
+      await auth.verifyMagicLink(token: token);
+    } finally {
+      if (_inFlightToken == token) _inFlightToken = null;
+    }
 
     if (!mounted) return;
+
+    final authState = ref.read(authNotifierProvider);
+    if (authState.status == AuthStatus.authenticated) {
+      _verifiedToken = token;
+    }
 
     // This listener is mounted from `App`'s builder, above the Navigator, so
     // its own context has neither an Overlay nor the router in it.
     final navigator = AppRouter.navigatorKey.currentState;
     if (navigator == null) return;
 
-    final authState = ref.read(authNotifierProvider);
     if (authState.status == AuthStatus.authenticated) {
       AppToastService.showAtRoot(
         navigator,

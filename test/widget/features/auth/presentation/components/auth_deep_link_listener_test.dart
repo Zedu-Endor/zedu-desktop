@@ -8,10 +8,18 @@ import 'package:zedu/features/features.dart';
 class MockAppLinks extends Mock implements AppLinks {}
 
 class FakeDeepLinkAuthNotifier extends AuthNotifier {
-  FakeDeepLinkAuthNotifier({this.onVerify, this.authenticated = false});
+  FakeDeepLinkAuthNotifier({
+    this.onVerify,
+    this.authenticated = false,
+    this.gate,
+  });
 
   final void Function(String token)? onVerify;
   final bool authenticated;
+
+  /// When set, verification waits for it, so a test can deliver a link again
+  /// while the first verification is still running.
+  final Completer<void>? gate;
 
   @override
   AuthState build() => const AuthState(status: AuthStatus.unauthenticated);
@@ -19,6 +27,7 @@ class FakeDeepLinkAuthNotifier extends AuthNotifier {
   @override
   Future<void> verifyMagicLink({required String token}) async {
     onVerify?.call(token);
+    await gate?.future;
     state = authenticated
         ? const AuthState(status: AuthStatus.authenticated)
         : const AuthState(status: AuthStatus.unauthenticated);
@@ -103,6 +112,65 @@ void main() {
       await tester.pump();
 
       expect(capturedToken, 't-123');
+    });
+
+    Future<void> pumpListener(
+      WidgetTester tester,
+      FakeDeepLinkAuthNotifier notifier,
+    ) async {
+      when(() => mockAppLinks.getInitialLink()).thenAnswer((_) async => null);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authNotifierProvider.overrideWith(() => notifier)],
+          child: MaterialApp(
+            home: AuthDeepLinkListener(
+              appLinks: mockAppLinks,
+              child: const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    final retryLink = Uri.parse('zedu://auth/magick-link/verify?token=t-9');
+
+    testWidgets('the same link can be retried after a failed verification', (
+      tester,
+    ) async {
+      final verified = <String>[];
+      await pumpListener(
+        tester,
+        FakeDeepLinkAuthNotifier(onVerify: verified.add),
+      );
+
+      linkController.add(retryLink);
+      await tester.pump();
+      linkController.add(retryLink);
+      await tester.pump();
+
+      expect(verified, ['t-9', 't-9']);
+    });
+
+    testWidgets('a link delivered again while it is verifying is ignored', (
+      tester,
+    ) async {
+      final verified = <String>[];
+      final gate = Completer<void>();
+      await pumpListener(
+        tester,
+        FakeDeepLinkAuthNotifier(onVerify: verified.add, gate: gate),
+      );
+
+      linkController.add(retryLink);
+      await tester.pump();
+      linkController.add(retryLink);
+      await tester.pump();
+
+      expect(verified, ['t-9']);
+
+      gate.complete();
+      await tester.pump();
     });
 
     testWidgets('a successful verification reaches the user', (tester) async {
