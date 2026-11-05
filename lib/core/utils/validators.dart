@@ -63,6 +63,24 @@ class Validators {
     }
     return null;
   }
+
+  static const channelNameMaxLength = 40;
+
+  static String normalizeChannelName(String raw) {
+    return raw.trim().replaceAll(RegExp(r'\s+'), '-').toLowerCase();
+  }
+
+  static String? validateChannelName(String? value) {
+    if (value == null) return 'Channel name is required';
+    final normalized = normalizeChannelName(value);
+    if (normalized.isEmpty) {
+      return 'Channel name is required';
+    }
+    if (normalized.length > channelNameMaxLength) {
+      return 'Channel name must be $channelNameMaxLength characters or fewer';
+    }
+    return null;
+  }
 }
 
 class PasswordRequirement {

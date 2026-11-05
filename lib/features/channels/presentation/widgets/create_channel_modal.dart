@@ -27,7 +27,15 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
   }
 
   Future<void> _createChannel() async {
-    if (_nameController.text.trim().isEmpty) return;
+    final validationError = Validators.validateChannelName(
+      _nameController.text,
+    );
+    if (validationError != null) {
+      setState(() {
+        _errorMessage = validationError;
+      });
+      return;
+    }
     // A second tap before the screen rebuilds must not start a second create.
     if (_isCreating) return;
     setState(() {
@@ -38,7 +46,7 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
     final result = await ref
         .read(channelProvider.notifier)
         .createChannel(
-          name: _nameController.text.trim(),
+          name: Validators.normalizeChannelName(_nameController.text),
           description: _descController.text.trim(),
           topic: _topicController.text.trim(),
           isPrivate: _isPrivate,
@@ -97,6 +105,13 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
+              maxLength: Validators.channelNameMaxLength,
+              buildCounter: (
+                _, {
+                required currentLength,
+                required isFocused,
+                maxLength,
+              }) => null,
               decoration: InputDecoration(
                 hintText: 'e.g. plan-budget',
                 border: OutlineInputBorder(

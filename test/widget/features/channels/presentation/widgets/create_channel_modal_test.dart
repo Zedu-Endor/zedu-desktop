@@ -11,13 +11,18 @@ class _FakeChannelNotifier extends ChannelNotifier {
   @override
   Future<List<Channel>> build() async => const [];
 
+  String? createdName;
+
   @override
   Future<Result<Channel>> createChannel({
     required String name,
     required String description,
     required bool isPrivate,
     String? topic,
-  }) async => result;
+  }) async {
+    createdName = name;
+    return result;
+  }
 }
 
 void main() {
@@ -87,9 +92,8 @@ void main() {
     ) async {
       await openModal(tester);
       // Build the provider first, then fail its channel load.
-      ProviderScope.containerOf(
-        tester.element(find.byType(CreateChannelModal)),
-      ).read(channelProvider);
+      ProviderScope.containerOf(tester.element(find.byType(CreateChannelModal)))
+          .read(channelProvider);
       await tester.pumpAndSettle();
       notifier.state = AsyncError<List<Channel>>(
         const ApiFailure(message: 'Could not load channels'),
@@ -117,6 +121,18 @@ void main() {
       await submit(tester);
 
       expect(find.text('Create a channel'), findsNothing);
+    });
+
+    testWidgets('normalises the channel name before sending to provider', (
+      tester,
+    ) async {
+      await openModal(tester);
+
+      await tester.enterText(find.byType(TextField).first, '  New   Project  ');
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+
+      expect(notifier.createdName, 'new-project');
     });
   });
 }
