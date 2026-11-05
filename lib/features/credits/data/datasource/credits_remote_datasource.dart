@@ -47,11 +47,28 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
     if (_config.usesMockData) {
       return CreditUsageModel.fromJson(_mockUsage);
     }
+    try {
+      final reportResponse = await _api.get<Map<String, dynamic>>(
+        path: '/credits/usage-report/$orgId',
+      );
+      final reportData = reportResponse.data['data'];
+      if (reportData is Map<String, dynamic>) {
+        return CreditUsageModel.fromJson(reportData);
+      }
+    } catch (_) {
+      // Fall back to /credits/usage/$orgId if usage-report fails
+    }
     final response = await _api.get<Map<String, dynamic>>(
       path: '/credits/usage/$orgId',
     );
-    return CreditUsageModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+    final data = response.data['data'];
+    if (data is Map<String, dynamic>) {
+      return CreditUsageModel.fromJson(data);
+    }
+    return const CreditUsageModel(
+      balance: 0,
+      totalPurchased: 0,
+      totalConsumed: 0,
     );
   }
 
@@ -63,8 +80,15 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
     final response = await _api.get<Map<String, dynamic>>(
       path: '/credits/usage-report/$orgId',
     );
-    return CreditUsageReportModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+    final data = response.data['data'];
+    if (data is Map<String, dynamic>) {
+      return CreditUsageReportModel.fromJson(data);
+    }
+    return const CreditUsageReportModel(
+      balance: 0,
+      purchased: 0,
+      consumed: 0,
+      periodLabel: 'This month',
     );
   }
 
