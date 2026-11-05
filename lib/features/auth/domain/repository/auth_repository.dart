@@ -39,4 +39,6 @@ abstract interface class AuthRepository {
     required bool clearStatus,
     required bool online,
   });
+  Future<Result<void>> requestEmailVerification({required String email});
+  Future<Result<void>> verifyEmailToken({required String token});
 }

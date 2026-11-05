@@ -1,4 +1,5 @@
 import '../../../../helpers/helpers.dart';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -110,6 +111,65 @@ void main() {
         final result = await repository.getCurrentUser();
 
         expect(result, isA<Failure<User>>());
+      });
+    });
+
+    group('requestEmailVerification', () {
+      test('returns Success<void> when datasource succeeds', () async {
+        when(
+          () => mockDatasource.requestEmailVerification(
+            email: 'test@example.com',
+          ),
+        ).thenAnswer((_) async {});
+
+        final result = await repository.requestEmailVerification(
+          email: 'test@example.com',
+        );
+
+        expect(result, isA<Success<void>>());
+      });
+
+      test('returns Failure when datasource throws ApiFailure', () async {
+        when(
+          () => mockDatasource.requestEmailVerification(
+            email: 'test@example.com',
+          ),
+        ).thenThrow(
+          const ApiFailure(
+            message: 'Rate limit exceeded',
+            kind: ApiFailureKind.client,
+          ),
+        );
+
+        final result = await repository.requestEmailVerification(
+          email: 'test@example.com',
+        );
+
+        expect(result, isA<Failure<void>>());
+      });
+    });
+
+    group('verifyEmailToken', () {
+      test('returns Success<void> when datasource succeeds', () async {
+        when(() => mockDatasource.verifyEmailToken(token: '123456'))
+            .thenAnswer((_) async {});
+
+        final result = await repository.verifyEmailToken(token: '123456');
+
+        expect(result, isA<Success<void>>());
+      });
+
+      test('returns Failure when datasource throws ApiFailure', () async {
+        when(() => mockDatasource.verifyEmailToken(token: '123456')).thenThrow(
+          const ApiFailure(
+            message: 'Invalid code',
+            kind: ApiFailureKind.client,
+          ),
+        );
+
+        final result = await repository.verifyEmailToken(token: '123456');
+
+        expect(result, isA<Failure<void>>());
       });
     });
   });

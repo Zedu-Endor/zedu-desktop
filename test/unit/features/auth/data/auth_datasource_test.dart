@@ -1,4 +1,5 @@
 import '../../../../helpers/helpers.dart';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -133,14 +134,13 @@ void main() {
           'organisation_id': 'org-1',
         };
 
-        when(
-          () => mockApi.get<Map<String, dynamic>>(path: '/profile'),
-        ).thenAnswer(
-          (_) async => ApiResponseModel<Map<String, dynamic>>(
-            data: {'data': rawProfile},
-            statusCode: 200,
-          ),
-        );
+        when(() => mockApi.get<Map<String, dynamic>>(path: '/profile'))
+            .thenAnswer(
+              (_) async => ApiResponseModel<Map<String, dynamic>>(
+                data: {'data': rawProfile},
+                statusCode: 200,
+              ),
+            );
 
         final datasource = AuthRemoteDataSourceImpl(
           config: const AppConfig(
@@ -157,21 +157,19 @@ void main() {
         expect(user.currentOrg, 'org-1');
         expect(user.fullname, 'Test Og');
         expect(user.createdAt, DateTime.parse('2024-08-11T19:51:50+01:00'));
-        verify(
-          () => mockApi.get<Map<String, dynamic>>(path: '/profile'),
-        ).called(1);
+        verify(() => mockApi.get<Map<String, dynamic>>(path: '/profile'))
+            .called(1);
         verifyNever(() => mockApi.get<Map<String, dynamic>>(path: '/auth/me'));
       });
 
       test('rethrows ApiFailure from GET /profile', () async {
-        when(
-          () => mockApi.get<Map<String, dynamic>>(path: '/profile'),
-        ).thenThrow(
-          const ApiFailure(
-            message: 'Unauthorized',
-            kind: ApiFailureKind.unauthorized,
-          ),
-        );
+        when(() => mockApi.get<Map<String, dynamic>>(path: '/profile'))
+            .thenThrow(
+              const ApiFailure(
+                message: 'Unauthorized',
+                kind: ApiFailureKind.unauthorized,
+              ),
+            );
 
         final datasource = AuthRemoteDataSourceImpl(
           config: const AppConfig(
@@ -250,6 +248,167 @@ void main() {
           ),
         ).called(1);
       });
+    });
+
+    group('requestEmailVerification', () {
+      test('returns without network call when usesMockData is true', () async {
+        final datasource = AuthRemoteDataSourceImpl(
+          config: const AppConfig(
+            apiBaseUrl: 'https://api.example.com',
+            usesMockData: true,
+          ),
+          apiBaseService: mockApi,
+        );
+
+        await datasource.requestEmailVerification(email: 'verify@example.com');
+
+        verifyNever(
+          () => mockApi.post<dynamic>(
+            path: any(named: 'path'),
+            data: any(named: 'data'),
+          ),
+        );
+      });
+
+      test('calls POST /auth/email-request with email', () async {
+        when(
+          () => mockApi.post<dynamic>(
+            path: '/auth/email-request',
+            data: {'email': 'verify@example.com'},
+          ),
+        ).thenAnswer(
+          (_) async => ApiResponseModel<dynamic>(
+            data: {'status': 'success'},
+            statusCode: 200,
+          ),
+        );
+
+        final datasource = AuthRemoteDataSourceImpl(
+          config: const AppConfig(
+            apiBaseUrl: 'https://api.example.com',
+            usesMockData: false,
+          ),
+          apiBaseService: mockApi,
+        );
+
+        await datasource.requestEmailVerification(email: 'verify@example.com');
+
+        verify(
+          () => mockApi.post<dynamic>(
+            path: '/auth/email-request',
+            data: {'email': 'verify@example.com'},
+          ),
+        ).called(1);
+      });
+
+      test('rethrows ApiFailure from POST /auth/email-request', () async {
+        when(
+          () => mockApi.post<dynamic>(
+            path: '/auth/email-request',
+            data: any(named: 'data'),
+          ),
+        ).thenThrow(
+          const ApiFailure(
+            message: 'Too many requests',
+            kind: ApiFailureKind.client,
+          ),
+        );
+
+        final datasource = AuthRemoteDataSourceImpl(
+          config: const AppConfig(
+            apiBaseUrl: 'https://api.example.com',
+            usesMockData: false,
+          ),
+          apiBaseService: mockApi,
+        );
+
+        await expectLater(
+          datasource.requestEmailVerification(email: 'verify@example.com'),
+          throwsA(isA<ApiFailure>()),
+        );
+      });
+    });
+
+    group('verifyEmailToken', () {
+      test('returns without network call when usesMockData is true', () async {
+        final datasource = AuthRemoteDataSourceImpl(
+          config: const AppConfig(
+            apiBaseUrl: 'https://api.example.com',
+            usesMockData: true,
+          ),
+          apiBaseService: mockApi,
+        );
+
+        await datasource.verifyEmailToken(token: '123456');
+
+        verifyNever(
+          () => mockApi.post<dynamic>(
+            path: any(named: 'path'),
+            data: any(named: 'data'),
+          ),
+        );
+      });
+
+      test('calls POST /auth/email-request/verify with token', () async {
+        when(
+          () => mockApi.post<dynamic>(
+            path: '/auth/email-request/verify',
+            data: {'token': '123456'},
+          ),
+        ).thenAnswer(
+          (_) async => ApiResponseModel<dynamic>(
+            data: {'status': 'success'},
+            statusCode: 200,
+          ),
+        );
+
+        final datasource = AuthRemoteDataSourceImpl(
+          config: const AppConfig(
+            apiBaseUrl: 'https://api.example.com',
+            usesMockData: false,
+          ),
+          apiBaseService: mockApi,
+        );
+
+        await datasource.verifyEmailToken(token: '123456');
+
+        verify(
+          () => mockApi.post<dynamic>(
+            path: '/auth/email-request/verify',
+            data: {'token': '123456'},
+          ),
+        ).called(1);
+      });
+
+      test(
+        'rethrows ApiFailure from POST /auth/email-request/verify',
+        () async {
+          when(
+            () => mockApi.post<dynamic>(
+              path: '/auth/email-request/verify',
+              data: any(named: 'data'),
+            ),
+          ).thenThrow(
+            const ApiFailure(
+              message: 'Invalid OTP',
+              kind: ApiFailureKind.client,
+            ),
+          );
+
+          final datasource = AuthRemoteDataSourceImpl(
+            config: const AppConfig(
+              apiBaseUrl: 'https://api.example.com',
+              usesMockData: false,
+            ),
+            apiBaseService: mockApi,
+          );
+
+          await expectLater(
+            datasource.verifyEmailToken(token: '123456'),
+            throwsA(isA<ApiFailure>()),
+          );
+        },
+      );
     });
   });
 }

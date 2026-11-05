@@ -37,6 +37,8 @@ abstract interface class AuthRemoteDataSource {
     required bool clearStatus,
     required bool online,
   });
+  Future<void> requestEmailVerification({required String email});
+  Future<void> verifyEmailToken({required String token});
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -351,6 +353,53 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       rethrow;
     } catch (error) {
       AppLogger.e('Failed /profile/change-status', tag: _tag, error: error);
+      throw ApiFailure.unknown(error);
+    }
+  }
+
+  @override
+  Future<void> requestEmailVerification({required String email}) async {
+    try {
+      if (_config.usesMockData) {
+        AppLogger.d('Using mock data for POST /auth/email-request', tag: _tag);
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        return;
+      }
+
+      AppLogger.d('POST /auth/email-request — $email', tag: _tag);
+      await _apiBaseService.post<dynamic>(
+        path: '/auth/email-request',
+        data: {'email': email},
+      );
+    } on ApiFailure {
+      rethrow;
+    } catch (error) {
+      AppLogger.e('Failed /auth/email-request', tag: _tag, error: error);
+      throw ApiFailure.unknown(error);
+    }
+  }
+
+  @override
+  Future<void> verifyEmailToken({required String token}) async {
+    try {
+      if (_config.usesMockData) {
+        AppLogger.d(
+          'Using mock data for POST /auth/email-request/verify',
+          tag: _tag,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        return;
+      }
+
+      AppLogger.d('POST /auth/email-request/verify', tag: _tag);
+      await _apiBaseService.post<dynamic>(
+        path: '/auth/email-request/verify',
+        data: {'token': token},
+      );
+    } on ApiFailure {
+      rethrow;
+    } catch (error) {
+      AppLogger.e('Failed /auth/email-request/verify', tag: _tag, error: error);
       throw ApiFailure.unknown(error);
     }
   }
