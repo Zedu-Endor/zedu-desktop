@@ -1,5 +1,6 @@
 export 'auth/auth.dart';
 export 'credits/credits.dart';
+export 'download/download.dart';
 export 'home/home.dart';
 export 'workspaces/workspaces.dart';
 export 'sidebar/sidebar.dart';
