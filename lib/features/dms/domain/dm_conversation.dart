@@ -115,15 +115,30 @@ class DmPreviewThread {
     this.messageCount = 0,
   });
 
+  static DateTime _parseCreatedAt(Object? raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is num) {
+      final value = raw.toInt();
+      final ms = value < 10000000000 ? value * 1000 : value;
+      return DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
+    }
+    final text = raw.toString().trim();
+    if (text.isEmpty) return DateTime.now();
+    final numeric = int.tryParse(text);
+    if (numeric != null) {
+      final ms = numeric < 10000000000 ? numeric * 1000 : numeric;
+      return DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
+    }
+    return DateTime.tryParse(text)?.toLocal() ?? DateTime.now();
+  }
+
   factory DmPreviewThread.fromJson(Map<String, dynamic> json) {
     return DmPreviewThread(
       threadId: json['thread_id'] as String? ?? '',
       message: json['message'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       username: json['username'] as String? ?? '',
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String).toLocal()
-          : DateTime.now(),
+      createdAt: _parseCreatedAt(json['created_at']),
       messageCount: json['message_count'] as int? ?? 0,
     );
   }
