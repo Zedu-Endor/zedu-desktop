@@ -52,4 +52,28 @@ void main() {
       expect(find.text('2 participant'), findsNothing);
     });
   });
+
+  group('BuzzMeetingView share screen button', () {
+    testWidgets('tells the user screen sharing is not available yet', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(buildBuzzMeetingViewUnderTest(isFullPage: true));
+      await tester.pump();
+
+      const message = 'Screen sharing is not available yet.';
+      expect(find.text(message), findsNothing);
+
+      await tester.tap(find.byIcon(Icons.screen_share_outlined));
+      await tester.pump();
+
+      expect(find.text(message), findsOneWidget);
+
+      // Let the toast's auto-dismiss timer finish.
+      await tester.pump(const Duration(seconds: 10));
+    });
+  });
 }
