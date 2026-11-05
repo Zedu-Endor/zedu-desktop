@@ -163,6 +163,50 @@ void main() {
     );
   });
 
+  group('CreditsRemoteDataSourceImpl.getUsage', () {
+    test('reads the balance and totals from the usage report', () async {
+      when(
+        () => api.get<Map<String, dynamic>>(
+          path: '/credits/usage-report/org-1',
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {
+            'status': 'success',
+            'data': {'balance': 42, 'total_credited': 50, 'total_used': 8},
+          },
+        ),
+      );
+
+      final usage = await datasource.getUsage('org-1');
+
+      expect(usage.balance, 42);
+      expect(usage.totalPurchased, 50);
+      expect(usage.totalConsumed, 8);
+      verifyNever(
+        () => api.get<Map<String, dynamic>>(path: '/credits/usage/org-1'),
+      );
+    });
+
+    test('a list payload gives an empty usage instead of throwing', () async {
+      when(
+        () => api.get<Map<String, dynamic>>(
+          path: '/credits/usage-report/org-1',
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {'status': 'success', 'data': <dynamic>[]},
+        ),
+      );
+
+      final usage = await datasource.getUsage('org-1');
+
+      expect(usage.balance, 0);
+    });
+  });
+
   group('CreditsRepositoryImpl.purchaseCredits', () {
     test('delegates to remote data source and returns Success', () async {
       when(

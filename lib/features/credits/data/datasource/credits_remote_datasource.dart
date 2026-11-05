@@ -49,11 +49,14 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
     if (_config.usesMockData) {
       return CreditUsageModel.fromJson(_mockUsage);
     }
+    // GET /credits/usage/{orgId} lists per-agent usage rows, not totals. The
+    // balance and the credited/used totals come from the usage report.
     final response = await _api.get<Map<String, dynamic>>(
-      path: '/credits/usage/$orgId',
+      path: '/credits/usage-report/$orgId',
     );
+    final data = response.data['data'];
     return CreditUsageModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+      data is Map<String, dynamic> ? data : const <String, dynamic>{},
     );
   }
 
