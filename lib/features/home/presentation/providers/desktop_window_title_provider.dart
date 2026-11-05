@@ -40,6 +40,7 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
   final channels = ref.watch(channelProvider).value ?? const [];
   final dms = ref.watch(dmListProvider).value ?? const [];
   final selectedDm = ref.watch(selectedDmProvider);
+  final groupDms = ref.watch(groupDmProvider);
 
   String? contextName;
   switch (activeChat.type) {
@@ -81,7 +82,14 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
       break;
 
     case ActiveChatType.groupDm:
-      contextName = 'Group Chat';
+      final groupName = groupDms
+          .where((g) => g.id == activeChat.id)
+          .firstOrNull
+          ?.name
+          .trim();
+      contextName = groupName != null && groupName.isNotEmpty
+          ? groupName
+          : 'Group Chat';
       break;
 
     case ActiveChatType.channelDirectory:
@@ -110,6 +118,14 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
         (d.participantId == activeChat.id || d.channelId == activeChat.id);
     if (!isActive) {
       unreadCount += d.unreadCount.toInt();
+    }
+  }
+
+  for (final g in groupDms) {
+    final isActive =
+        activeChat.type == ActiveChatType.groupDm && g.id == activeChat.id;
+    if (!isActive) {
+      unreadCount += g.unreadCount;
     }
   }
 
