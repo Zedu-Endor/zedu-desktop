@@ -64,26 +64,25 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   @override
   Future<ProfileAccountModel> updateAccount(ProfileAccount account) async {
     if (_config.usesMockData) {
-      AppLogger.d('Using mock data for PATCH /profile/account', tag: _tag);
-      return ProfileAccountModel(
-        name: account.name,
-        email: account.email,
-        timezone: account.timezone,
-        avatarUrl: account.avatarUrl,
-      );
+      AppLogger.d('Using mock data for PATCH /profile', tag: _tag);
+      return ProfileAccountModel.fromAccount(account);
     }
-    final response = await _apiBaseService.patch<Map<String, dynamic>>(
-      path: '/profile/account',
-      data: {
-        'name': account.name,
-        'email': account.email,
-        'timezone': account.timezone,
-        'avatar_url': account.avatarUrl,
-      },
+    // Same endpoint and multipart fields as Zedu web. Empty values are left
+    // out so fields the user didn't change are never overwritten.
+    final fields = <String, String>{
+      'full_name': account.name,
+      'display_name': account.displayName,
+      'username': account.username,
+      'phone': account.phoneNumber,
+      'title': account.title,
+      'timezone': account.timezone,
+      'name_pronounciation': account.namePronunciation,
+    }..removeWhere((_, value) => value.isEmpty);
+    await _apiBaseService.patch<Map<String, dynamic>>(
+      path: '/profile',
+      data: FormData.fromMap(fields),
     );
-    return ProfileAccountModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
-    );
+    return ProfileAccountModel.fromAccount(account);
   }
 
   @override
@@ -156,15 +155,12 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
     required String newPassword,
   }) async {
     if (_config.usesMockData) {
-      AppLogger.d(
-        'Using mock data for POST /profile/security/password',
-        tag: _tag,
-      );
+      AppLogger.d('Using mock data for PUT /auth/change-password', tag: _tag);
       return;
     }
-    await _apiBaseService.post<Map<String, dynamic>>(
-      path: '/profile/security/password',
-      data: {'current_password': currentPassword, 'new_password': newPassword},
+    await _apiBaseService.put<dynamic>(
+      path: '/auth/change-password',
+      data: {'old_password': currentPassword, 'new_password': newPassword},
     );
   }
 

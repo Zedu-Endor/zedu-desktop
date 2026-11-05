@@ -1,12 +1,9 @@
 name: Sync upstream
 
-# Review-org only. Keeps the chain upstream -> TARGET -> dev in sync by merging with a merge commit and
-# pushing (squashing would break the shared history, so no human picks the merge method).
-# Logic: .github/scripts/sync-merge.sh. A clean merge is pushed with the sync deploy key, which bypasses
-# the branch rulesets. A merge that conflicts or changes review-org paths (.github/upstream-exclude)
-# opens a sync PR for a reviewer instead; its body says how to finish (re-run with approve_protected or
-# resolution). Don't merge sync PRs by hand: the workflow's push marks them merged.
-#
+# Caller: the logic lives in zedu-hng/zedu-ci (upstream-sync.yml), pinned by commit. Review-org only.
+# Keeps the chain upstream -> central-staging -> dev in sync with merge commits. A merge that conflicts
+# or changes review-org paths (.github/upstream-exclude) opens a sync PR for a reviewer; its body says
+# how to finish (re-run with approve_protected or resolution). Don't merge sync PRs by hand.
 # Config (set only in the review org, so contributor forks skip this):
 #   vars.UPSTREAM_REPO      e.g. zeduchat/zedu-desktop
 #   vars.UPSTREAM_BRANCH    branch that batches go to upstream (default: central-staging)
@@ -15,7 +12,7 @@ name: Sync upstream
 
 on:
   schedule:
-    - cron: "0 6 * * *"
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       approve_protected:
@@ -23,12 +20,10 @@ on:
         type: boolean
         default: false
       resolution:
-        description: "Conflict resolved on a branch: <target>:<branch>, e.g. dev:sync-fix"
+        description: 'Conflict resolved on a branch: <target>:<branch>, e.g. dev:sync-fix'
         required: false
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: sync-upstream
@@ -38,77 +33,14 @@ jobs:
   sync:
     name: Sync branches
     if: vars.UPSTREAM_REPO != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: ${{ github.repository }}
-      UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }}
-      TARGET: ${{ vars.UPSTREAM_BRANCH || 'central-staging' }}
-      APPROVE_PROTECTED: ${{ inputs.approve_protected && '1' || '' }}
-      RESOLUTION: ${{ inputs.resolution }}
-      HAS_KEY: ${{ secrets.SYNC_DEPLOY_KEY != '' }}
-    steps:
-      - name: Check deploy key
-        if: env.HAS_KEY != 'true'
-        run: |
-          echo "::error::SYNC_DEPLOY_KEY secret is missing. Sync can't push. Run the deploy-key setup script."
-          exit 1
-
-      # Script and exclude list come from dev, never from upstream or a PR.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          ref: dev
-          fetch-depth: 0
-          ssh-key: ${{ secrets.SYNC_DEPLOY_KEY }}
-
-      - name: Sync
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote add upstream "https://github.com/$UPSTREAM_REPO.git"
-          git fetch -q --no-tags upstream "$TARGET"
-          cp .github/scripts/sync-merge.sh .github/upstream-exclude "$RUNNER_TEMP/"
-
-          res_target=${RESOLUTION%%:*}
-          res_branch=${RESOLUTION#*:}
-          if [ -n "$RESOLUTION" ]; then
-            [[ "$RESOLUTION" == *:* && ( "$res_target" == dev || "$res_target" == "$TARGET" ) && -n "$res_branch" ]] \
-              || { echo "::error::resolution must be <dev|$TARGET>:<branch>, got '$RESOLUTION'"; exit 1; }
-          fi
-
-          # sync <target> <source-ref> <label> <pr-head>: merge and push, or open/refresh a sync PR.
-          sync() {
-            local target=$1 source=$2 label=$3 head=$4 rc=0 resolution_ref="" number body
-            git fetch -q --no-tags origin "$target"
-            if [ -n "$RESOLUTION" ] && [ "$res_target" = "$target" ]; then
-              git fetch -q --no-tags origin "$res_branch"
-              resolution_ref="origin/$res_branch"
-            fi
-            TARGET=$target SOURCE_REF=$source SOURCE_LABEL=$label RESOLUTION_REF=$resolution_ref \
-              EXCLUDE_FILE="$RUNNER_TEMP/upstream-exclude" bash "$RUNNER_TEMP/sync-merge.sh" || rc=$?
-            { echo "### $target"; echo; cat sync-result.md; echo; } >> "$GITHUB_STEP_SUMMARY"
-            case $rc in
-              0) return 0 ;;
-              3|4) ;;
-              *) echo "::error::Sync into $target failed (exit $rc)"; return "$rc" ;;
-            esac
-            echo "::warning::$target needs a reviewer; see the sync PR."
-            number=$(gh api -X GET "repos/$REPO/pulls" -f state=open -f base="$target" -f head="$head" --jq '.[0].number // empty')
-            body=$(cat sync-result.md)
-            if [ -n "$number" ]; then
-              gh pr edit "$number" --repo "$REPO" --body "$body" >/dev/null
-              echo "Updated sync PR #$number"
-            else
-              args=(--repo "$REPO" --base "$target" --head "$head" --title "chore: sync $target from $label" --body "$body")
-              # A cross-repo head is upstream's branch; this token can't grant its maintainers edit rights.
-              [[ "$head" == *:* ]] && args+=(--no-maintainer-edit)
-              gh pr create "${args[@]}"
-            fi
-          }
-
-          # The PR head filter needs owner:branch, even for same-repo branches.
-          sync "$TARGET" "upstream/$TARGET" "$UPSTREAM_REPO:$TARGET" "${UPSTREAM_REPO%%/*}:$TARGET"
-          # Pick up the push above, or a promotion merged while this ran.
-          git fetch -q --no-tags origin "$TARGET"
-          sync dev "origin/$TARGET" "$TARGET" "${REPO%%/*}:$TARGET"
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: zedu-hng/zedu-ci/.github/workflows/upstream-sync.yml@4e68db81f7dc1ecfbb656308c1a9e9b718eaae0c
+    with:
+      upstream_repo: ${{ vars.UPSTREAM_REPO }}
+      upstream_branch: ${{ vars.UPSTREAM_BRANCH || 'central-staging' }}
+      approve_protected: ${{ inputs.approve_protected || false }}
+      resolution: ${{ inputs.resolution || '' }}
+    secrets:
+      SYNC_DEPLOY_KEY: ${{ secrets.SYNC_DEPLOY_KEY }}

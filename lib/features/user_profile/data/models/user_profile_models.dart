@@ -6,7 +6,28 @@ class ProfileAccountModel extends ProfileAccount {
     required super.email,
     required super.timezone,
     super.avatarUrl,
+    super.displayName,
+    super.username,
+    super.phoneNumber,
+    super.title,
+    super.namePronunciation,
+    super.country,
   });
+
+  factory ProfileAccountModel.fromAccount(ProfileAccount account) {
+    return ProfileAccountModel(
+      name: account.name,
+      email: account.email,
+      timezone: account.timezone,
+      avatarUrl: account.avatarUrl,
+      displayName: account.displayName,
+      username: account.username,
+      phoneNumber: account.phoneNumber,
+      title: account.title,
+      namePronunciation: account.namePronunciation,
+      country: account.country,
+    );
+  }
 
   factory ProfileAccountModel.fromJson(Map<String, dynamic> json) {
     return ProfileAccountModel(

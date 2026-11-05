@@ -27,11 +27,13 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       clearError: true,
       clearSuccess: true,
     );
-    final result = await _repository.updateAccount(account);
+    final current = state.account ?? ProfileAccount.empty();
+    final changes = _changedFields(account, current);
+    final result = await _repository.updateAccount(changes);
     switch (result) {
       case Success<ProfileAccount>():
         state = state.copyWith(
-          account: result.value,
+          account: _savedAccount(state.account ?? current, changes),
           isSaving: false,
           successMessage: 'Account information saved successfully.',
         );
@@ -41,6 +43,49 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           error: result.error.friendlyMessage,
         );
     }
+  }
+
+  /// Keeps only the fields the user edited (others become empty), so the
+  /// placeholder values shown before the profile loads are never saved.
+  ProfileAccount _changedFields(
+    ProfileAccount updated,
+    ProfileAccount current,
+  ) {
+    String changed(String now, String was) => now == was ? '' : now;
+    return ProfileAccount(
+      name: changed(updated.name, current.name),
+      email: changed(updated.email, current.email),
+      timezone: changed(updated.timezone, current.timezone),
+      avatarUrl: updated.avatarUrl,
+      displayName: changed(updated.displayName, current.displayName),
+      username: changed(updated.username, current.username),
+      phoneNumber: changed(updated.phoneNumber, current.phoneNumber),
+      title: changed(updated.title, current.title),
+      namePronunciation: changed(
+        updated.namePronunciation,
+        current.namePronunciation,
+      ),
+      country: changed(updated.country, current.country),
+    );
+  }
+
+  /// The profile as the server now holds it. `PATCH /profile` doesn't take
+  /// email, country or avatar, and the backend ignores empty values, so those
+  /// keep their current values instead of showing edits that weren't saved.
+  ProfileAccount _savedAccount(ProfileAccount current, ProfileAccount changes) {
+    String saved(String sent, String was) => sent.isEmpty ? was : sent;
+    return current.copyWith(
+      name: saved(changes.name, current.name),
+      timezone: saved(changes.timezone, current.timezone),
+      displayName: saved(changes.displayName, current.displayName),
+      username: saved(changes.username, current.username),
+      phoneNumber: saved(changes.phoneNumber, current.phoneNumber),
+      title: saved(changes.title, current.title),
+      namePronunciation: saved(
+        changes.namePronunciation,
+        current.namePronunciation,
+      ),
+    );
   }
 
   Future<void> deleteAccount() async {
@@ -191,7 +236,7 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
                 name: result.value.name,
                 avatar: '',
                 unreadCount: 0,
-                membersCount: 1,
+                channelsCount: 0,
               ),
             );
       case Failure<OrganizationProfile>():
