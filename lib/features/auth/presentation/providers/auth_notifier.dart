@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
@@ -38,21 +39,53 @@ class AuthNotifier extends Notifier<AuthState> {
         AppLogger.i('Session restored — ${result.value.email}', tag: _tag);
         state = AuthState(status: AuthStatus.authenticated, user: result.value);
       case Failure<User>():
-        AppLogger.w('Session restore failed — clearing token', tag: _tag);
-        await _storage.deleteAccessToken();
-        state = const AuthState(status: AuthStatus.unauthenticated);
+        final failure = result.error;
+        if (failure.kind == ApiFailureKind.unauthorized) {
+          // The server rejected the token, so it is really invalid.
+          AppLogger.w(
+            'Session restore rejected (401) — clearing token',
+            tag: _tag,
+          );
+          await _storage.deleteAccessToken();
+          state = const AuthState(status: AuthStatus.unauthenticated);
+        } else {
+          // Network, timeout or server problem: the token may still be valid.
+          // Keep it so the next launch can restore the session, and tell the
+          // user why they are on the login screen.
+          AppLogger.w(
+            'Session restore failed (${failure.kind.name}) — keeping token',
+            tag: _tag,
+          );
+          state = AuthState(
+            status: AuthStatus.unauthenticated,
+            error: failure.friendlyMessage,
+          );
+        }
     }
   }
 
-  Future<void> login({required String email, required String password}) async {
+  /// With [rememberMe] false the session lasts until the app closes.
+  Future<void> login({
+    required String email,
+    required String password,
+    bool rememberMe = true,
+  }) async {
     AppLogger.d('Login attempt — $email', tag: _tag);
     state = state.copyWith(isLoading: true, clearError: true);
 
     final result = await _repository.login(email: email, password: password);
     switch (result) {
       case Success<AuthSession>():
-        AppLogger.i('Login succeeded — token persisted', tag: _tag);
-        await _storage.saveAccessToken(result.value.accessToken);
+        AppLogger.i(
+          rememberMe
+              ? 'Login succeeded — token persisted'
+              : 'Login succeeded — token kept for this run only',
+          tag: _tag,
+        );
+        await _storage.saveAccessToken(
+          result.value.accessToken,
+          persist: rememberMe,
+        );
         state = AuthState(
           status: AuthStatus.authenticated,
           user: result.value.user,
@@ -232,9 +265,11 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     HttpServer? server;
+    // Read before the first await so a disposed notifier cannot read a ref.
+    final redirectTimeout = ref.read(googleRedirectTimeoutProvider);
+    final port = ref.read(googleRedirectPortProvider);
     try {
       final config = locator<AppConfig>();
-      const port = 8000; // Standard redirect port for desktop
 
       // 1. Bind to localhost port to intercept the redirect
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
@@ -252,11 +287,11 @@ class AuthNotifier extends Notifier<AuthState> {
       });
 
       AppLogger.d('Launching Google Auth URL in browser', tag: _tag);
-      await launchUrl(authUrl, mode: LaunchMode.externalApplication);
+      await ref.read(externalUrlLauncherProvider)(authUrl);
 
       // 3. Wait for Google's redirect containing the authorization code
       String? grantCode;
-      await for (final request in server) {
+      await for (final request in server.timeout(redirectTimeout)) {
         grantCode = request.uri.queryParameters['code'];
 
         // Return a clean success page to the user in their browser
@@ -323,6 +358,15 @@ class AuthNotifier extends Notifier<AuthState> {
             error: result.error.friendlyMessage,
           );
       }
+    } on TimeoutException {
+      AppLogger.w(
+        'Google Sign-In timed out waiting for the redirect',
+        tag: _tag,
+      );
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Google Sign-In timed out. Please try again.',
+      );
     } catch (e) {
       AppLogger.e('Google Sign-In failed', tag: _tag, error: e);
       state = state.copyWith(isLoading: false, error: 'Google Sign-In failed');

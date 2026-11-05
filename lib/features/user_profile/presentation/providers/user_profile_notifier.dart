@@ -6,10 +6,27 @@ import 'package:zedu/features/features.dart';
 class UserProfileNotifier extends Notifier<UserProfileState> {
   late final UserProfileRepository _repository;
 
+  /// Identifies the latest [load]. A load that is no longer the latest drops
+  /// its result, even when the selected workspace is the same one again
+  /// (switching A to B and back to A).
+  int _loadCounter = 0;
+
   @override
   UserProfileState build() {
     _repository = ref.read(userProfileRepositoryProvider);
-    load();
+    // The profile can stay open while the workspace is switched, so reload
+    // the workspace-dependent details (organization, members) for the new one.
+    ref.listen(
+      workspaceProvider.select((state) => state.selectedWorkspace?.id),
+      (previous, next) {
+        if (previous != next) load();
+      },
+    );
+    // load() reads and writes state, which is not available until build()
+    // returns, so it starts right after, unless the provider was disposed.
+    Future.microtask(() {
+      if (ref.mounted) load();
+    });
     return const UserProfileState(isLoading: true);
   }
 
@@ -190,7 +207,10 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       clearError: true,
       clearSuccess: true,
     );
-    final result = await _repository.updateOrganization(organization);
+    final result = await _repository.updateOrganization(
+      organization,
+      orgId: ref.read(workspaceProvider).selectedWorkspace?.id,
+    );
     switch (result) {
       case Success<OrganizationProfile>():
         state = state.copyWith(
@@ -253,7 +273,8 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       clearError: true,
       clearSuccess: true,
     );
-    final result = await _repository.deleteOrganization();
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    final result = await _repository.deleteOrganization(orgId: orgId);
     switch (result) {
       case Success<void>():
         state = state.copyWith(
@@ -475,18 +496,41 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     }
   }
 
+  bool _isObsoleteLoad(int loadId, String? orgId) {
+    if (!ref.mounted) return true;
+    final currentOrgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    return loadId != _loadCounter || currentOrgId != orgId;
+  }
+
   Future<void> load() async {
+    final loadId = ++_loadCounter;
     state = state.copyWith(isLoading: true, clearError: true);
     final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    try {
+      await _loadProfile(loadId, orgId);
+    } catch (_) {
+      if (_isObsoleteLoad(loadId, orgId)) return;
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Could not load your profile. Please try again.',
+      );
+    }
+  }
+
+  Future<void> _loadProfile(int loadId, String? orgId) async {
     final results = await Future.wait([
       _repository.getAccount(),
       _repository.getNotificationPreferences(),
       _repository.getSecuritySessions(),
-      _repository.getOrganization(),
+      _repository.getOrganization(orgId: orgId),
       _repository.getTeamMembers(orgId: orgId),
       _repository.getRolesAndPermissions(),
       _repository.getBillingInfo(),
     ]);
+
+    // A newer load started, or the workspace changed, while this was loading:
+    // drop the stale result, the newer load will fill the screen.
+    if (_isObsoleteLoad(loadId, orgId)) return;
 
     final accountResult = results[0] as Result<ProfileAccount>;
     final notificationResult = results[1] as Result<NotificationPreferences>;
@@ -526,6 +570,10 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
         } catch (_) {}
       }
     }
+
+    // The secure-storage read above can take long enough for another load to
+    // start, so check again right before writing the state.
+    if (_isObsoleteLoad(loadId, orgId)) return;
 
     state = state.copyWith(
       account: _valueOrNull(accountResult),

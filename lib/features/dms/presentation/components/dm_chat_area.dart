@@ -388,6 +388,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.call_end),
+                              tooltip: 'Cancel call',
                               color: Colors.red,
                               onPressed: () {
                                 ref

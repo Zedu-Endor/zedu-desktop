@@ -6,5 +6,8 @@ export 'emoji_picker_dialog.dart';
 export 'app_sidebar_rail.dart';
 export 'sidebar_popouts.dart';
 export 'top_user_menu.dart';
+export 'notifications_dialog.dart';
 export 'dm_empty_state.dart';
 export 'sidebar_channel_list.dart';
+export 'quick_switcher.dart';
+export 'quick_switcher_shortcut.dart';

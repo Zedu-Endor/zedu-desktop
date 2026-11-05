@@ -16,6 +16,7 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
   List<Map<String, dynamic>> _filteredUsers = [];
   bool _isLoading = false;
   bool _isAddingEveryone = false;
+  String? _emailError;
 
   @override
   void initState() {
@@ -57,21 +58,29 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     super.dispose();
   }
 
-  void _addEmailFromInput() {
+  /// Adds the typed email as an invite. Returns false, and shows an error,
+  /// when the box holds text that is not a valid email address.
+  bool _addEmailFromInput() {
     final email = _emailController.text.trim();
-    if (email.isNotEmpty && email.contains('@')) {
-      _addInvite(email, null);
+    if (email.isEmpty) return true;
+    if (Validators.validateEmail(context, email) != null) {
+      setState(() => _emailError = 'Please enter a valid email address.');
+      return false;
     }
+    _addInvite(email, null);
+    return true;
   }
 
   void _addInvite(String email, String? userId) {
-    if (!_invites.any((invite) => invite['email'] == email)) {
+    final key = email.toLowerCase();
+    if (!_invites.any((invite) => invite['email']!.toLowerCase() == key)) {
       setState(() {
         _invites.add({'email': email, 'userId': userId});
         _filteredUsers = [];
       });
     }
     _emailController.clear();
+    if (_emailError != null) setState(() => _emailError = null);
   }
 
   void _removeInvite(String email) {
@@ -81,7 +90,8 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
   }
 
   Future<void> _submit() async {
-    _addEmailFromInput(); // Catch any typed email not yet submitted
+    // Catch any typed email not yet submitted
+    if (!_addEmailFromInput()) return;
 
     if (_invites.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -267,7 +277,12 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(vertical: 8),
                       ),
-                      onChanged: _onSearchChanged,
+                      onChanged: (value) {
+                        if (_emailError != null) {
+                          setState(() => _emailError = null);
+                        }
+                        _onSearchChanged(value);
+                      },
                       onSubmitted: (_) => _addEmailFromInput(),
                       onEditingComplete: _addEmailFromInput,
                     ),
@@ -275,6 +290,14 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
                 ],
               ),
             ),
+            if (_emailError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _emailError!,
+                  style: TextStyle(color: colors.error, fontSize: 12),
+                ),
+              ),
             if (_filteredUsers.isNotEmpty)
               Container(
                 margin: const EdgeInsets.only(top: 4),

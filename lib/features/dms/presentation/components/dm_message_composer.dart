@@ -439,9 +439,16 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     final text = _controller.text;
     final sel = _controller.selection;
     if (!sel.isValid) return;
-    final insert = sel.isCollapsed
-        ? '> '
-        : '> ${text.substring(sel.start, sel.end)}';
+    final selected = text.substring(sel.start, sel.end);
+    // A selection that ends right after a newline leaves an empty last piece.
+    // Quoting it would put "> " on the first line that is not selected.
+    final endsWithNewline = selected.endsWith('\n');
+    final lines = selected.split('\n');
+    final quoted =
+        (endsWithNewline ? lines.sublist(0, lines.length - 1) : lines)
+            .map((line) => '> $line')
+            .join('\n');
+    final insert = endsWithNewline ? '$quoted\n' : quoted;
     final newText =
         text.substring(0, sel.start) + insert + text.substring(sel.end);
     _controller.value = TextEditingValue(

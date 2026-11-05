@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
@@ -40,7 +41,7 @@ void main() {
     await openDialog(tester, (account) => saved = account);
 
     await tester.enterText(find.byType(TextFormField).last, 'ugggge');
-    await tester.tap(find.text('Save Changes'));
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
     expect(find.text('Select a country from the list'), findsOneWidget);
@@ -59,7 +60,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nigeria').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save Changes'));
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
     expect(saved?.country, 'Nigeria');
@@ -72,10 +73,26 @@ void main() {
     await openDialog(tester, (account) => saved = account);
 
     await tester.enterText(find.byType(TextFormField).last, 'nigeria');
-    await tester.tap(find.text('Save Changes'));
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
     expect(find.text('Select a country from the list'), findsNothing);
     expect(saved?.country, 'Nigeria');
+  });
+
+  testWidgets('rejects a malformed email such as a bare @', (tester) async {
+    ProfileAccount? saved;
+    await openDialog(tester, (account) => saved = account);
+
+    final emailField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Email'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(emailField, '@');
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please enter a valid email'), findsOneWidget);
+    expect(saved, isNull);
   });
 }
