@@ -9,6 +9,7 @@ class UserManagementSection extends StatefulWidget {
     required this.onInvite,
     required this.onUpdate,
     required this.onRemove,
+    this.invitesCount = 0,
   });
 
   final List<TeamMember> members;
@@ -17,6 +18,7 @@ class UserManagementSection extends StatefulWidget {
   onInvite;
   final ValueChanged<TeamMember> onUpdate;
   final ValueChanged<String> onRemove;
+  final int invitesCount;
 
   @override
   State<UserManagementSection> createState() => _UserManagementSectionState();
@@ -66,7 +68,11 @@ class _UserManagementSectionState extends State<UserManagementSection> {
               active: true,
             ),
             const SizedBox(width: 32),
-            const _TabLabel(label: 'Invites', count: 1, active: false),
+            _TabLabel(
+              label: 'Invites',
+              count: widget.invitesCount,
+              active: false,
+            ),
           ],
         ),
         const SizedBox(height: 24),
