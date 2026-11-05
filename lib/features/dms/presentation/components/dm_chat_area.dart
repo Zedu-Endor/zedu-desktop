@@ -176,9 +176,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
           sender: history.isMyMessage(message)
               ? history.currentUserName
               : widget.conversation.displayName,
-          sentAt: DateTime.tryParse(
-            message['created_at']?.toString() ?? '',
-          )?.toLocal(),
+          sentAt: DateTime.tryParse(message['created_at']?.toString() ?? '')
+              ?.toLocal(),
         ),
     ].where((message) => message.text.isNotEmpty).toList();
     await showDialog<void>(
@@ -204,9 +203,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   }
 
   void _showActionNotice(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -1257,10 +1255,7 @@ class _AttachmentBubbleList extends StatelessWidget {
   const _AttachmentBubbleList({required this.media, required this.isMe});
 
   void _launchUrl(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    await openMessageLink(url);
   }
 
   void _openImage(BuildContext context, String imageUrl, String fileName) {
@@ -1281,7 +1276,9 @@ class _AttachmentBubbleList extends StatelessWidget {
   ) {
     final colors = context.colors;
     return GestureDetector(
-      onTap: fileLink.isNotEmpty ? () => _launchUrl(fileLink) : null,
+      onTap: messageLinkUri(fileLink) != null
+          ? () => _launchUrl(fileLink)
+          : null,
       child: Container(
         width: 120,
         padding: const EdgeInsets.all(8),

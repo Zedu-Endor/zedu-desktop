@@ -48,8 +48,7 @@ class _ConversationFilesDialogState extends State<ConversationFilesDialog> {
   Future<void> _open(String link) async {
     final open = widget.openLink;
     if (open != null) return open(link);
-    final uri = Uri.tryParse(link);
-    if (uri != null && await canLaunchUrl(uri)) await launchUrl(uri);
+    await openMessageLink(link);
   }
 
   @override
@@ -79,7 +78,7 @@ class _ConversationFilesDialogState extends State<ConversationFilesDialog> {
                     final file = files[index];
                     final name = file['file_name']?.toString() ?? 'Attachment';
                     final link = file['file_link']?.toString() ?? '';
-                    final canOpen = link.isNotEmpty;
+                    final canOpen = messageLinkUri(link) != null;
                     return Tooltip(
                       message: canOpen ? 'Open $name' : 'No link for this file',
                       child: ListTile(

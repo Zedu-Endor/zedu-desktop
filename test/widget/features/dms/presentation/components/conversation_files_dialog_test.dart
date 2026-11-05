@@ -31,6 +31,11 @@ List<Map<String, dynamic>> _page(int page) {
         'file_link': 'https://files.test/photo.png',
       },
       {'file_name': 'nolink.txt', 'file_type': 'txt'},
+      {
+        'file_name': 'dangerous.sh',
+        'file_type': 'sh',
+        'file_link': 'file:///etc/passwd',
+      },
     ]),
   ];
 }
@@ -104,6 +109,21 @@ void main() {
     final tile = tester.widget<ListTile>(
       find.ancestor(
         of: find.text('nolink.txt'),
+        matching: find.byType(ListTile),
+      ),
+    );
+    expect(tile.enabled, isFalse);
+  });
+  testWidgets('a file with a non-web scheme cannot be opened', (tester) async {
+    await pumpDialog(tester);
+
+    await tester.tap(find.text('dangerous.sh'));
+    await tester.pump();
+
+    expect(opened, isEmpty);
+    final tile = tester.widget<ListTile>(
+      find.ancestor(
+        of: find.text('dangerous.sh'),
         matching: find.byType(ListTile),
       ),
     );
