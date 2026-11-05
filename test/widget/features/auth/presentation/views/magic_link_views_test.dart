@@ -114,8 +114,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(capturedEmail, 'anonymoususer@gmail.com');
-      expect(find.text('Awesome! mail sent.'), findsOneWidget);
+      expect(find.text('Check your email'), findsOneWidget);
       expect(find.textContaining('anonymoususer@gmail.com'), findsOneWidget);
+      expect(
+        find.textContaining('Open the email and click the link to continue.'),
+        findsOneWidget,
+      );
       expect(find.byType(AuthHeaderStrip), findsOneWidget);
     });
 

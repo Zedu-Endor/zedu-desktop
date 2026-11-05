@@ -62,7 +62,7 @@ class _BillingSectionState extends ConsumerState<BillingSection> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'You are enjoying the full Zedu experience with ability to add as many users to your organization.',
+                      'You are enjoying the full Zedu experience with the ability to add as many users to your organization.',
                       style: context.textTheme.bodySmall?.copyWith(
                         color: colors.textSecondary.withValues(alpha: 0.6),
                         height: 1.4,
