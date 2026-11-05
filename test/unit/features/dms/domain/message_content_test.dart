@@ -76,5 +76,37 @@ void main() {
         'See this now',
       );
     });
+
+    test('preserves generic types, angle brackets, and emails', () {
+      expect(htmlMessageToMarkdown('List<String>'), 'List<String>');
+      expect(htmlMessageToMarkdown('Map<String, int>'), 'Map<String, int>');
+      expect(htmlMessageToMarkdown('<help@zedu.chat>'), '<help@zedu.chat>');
+      expect(htmlMessageToMarkdown('a < b and c > d'), 'a < b and c > d');
+      expect(
+        htmlMessageToMarkdown(
+          '<p>Here is <strong>bold</strong> and List<String></p>',
+        ),
+        'Here is **bold** and List<String>',
+      );
+      expect(
+        htmlMessageToMarkdown('<p>Contact <help@zedu.chat> for assistance</p>'),
+        'Contact <help@zedu.chat> for assistance',
+      );
+    });
+
+    test('decodes standalone entities without HTML tags', () {
+      expect(
+        htmlMessageToMarkdown("it&#39;s &#x27;ok&#X27; &#128512;"),
+        "it's 'ok' 😀",
+      );
+      expect(
+        htmlMessageToMarkdown('type &amp;lt; for &lt;'),
+        'type &lt; for <',
+      );
+      expect(
+        htmlMessageToMarkdown('AT&T &bogus; &#xFFFFFFF; &#xD800; &lt'),
+        'AT&T &bogus; &#xFFFFFFF; &#xD800; &lt',
+      );
+    });
   });
 }

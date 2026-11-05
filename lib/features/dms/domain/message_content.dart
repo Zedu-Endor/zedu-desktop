@@ -34,12 +34,121 @@ const _blockTags = {
   'h6',
 };
 
+const _otherHtmlTags = {
+  'a',
+  'abbr',
+  'address',
+  'area',
+  'article',
+  'aside',
+  'audio',
+  'base',
+  'bdi',
+  'bdo',
+  'body',
+  'button',
+  'canvas',
+  'caption',
+  'cite',
+  'col',
+  'colgroup',
+  'data',
+  'datalist',
+  'dd',
+  'details',
+  'dfn',
+  'dialog',
+  'dl',
+  'dt',
+  'embed',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'head',
+  'header',
+  'hgroup',
+  'html',
+  'iframe',
+  'img',
+  'input',
+  'ins',
+  'kbd',
+  'label',
+  'legend',
+  'link',
+  'main',
+  'map',
+  'mark',
+  'menu',
+  'meta',
+  'meter',
+  'nav',
+  'noscript',
+  'object',
+  'optgroup',
+  'option',
+  'output',
+  'picture',
+  'progress',
+  'q',
+  'rp',
+  'rt',
+  'ruby',
+  'samp',
+  'script',
+  'search',
+  'section',
+  'select',
+  'slot',
+  'small',
+  'source',
+  'span',
+  'style',
+  'sub',
+  'summary',
+  'sup',
+  'svg',
+  'table',
+  'tbody',
+  'td',
+  'template',
+  'textarea',
+  'tfoot',
+  'th',
+  'thead',
+  'time',
+  'title',
+  'tr',
+  'track',
+  'u',
+  'var',
+  'video',
+  'wbr',
+};
+
+const _structuralTags = {'br', 'hr', 'ul', 'ol', 'li'};
+
+bool _isKnownHtmlTag(String tag) =>
+    _inlineMarkers.containsKey(tag) ||
+    _structuralTags.contains(tag) ||
+    _blockTags.contains(tag) ||
+    _otherHtmlTags.contains(tag);
+
 /// Turns message content sent from web or mobile, which arrives as HTML
 /// (`<p>Hello <strong>you</strong></p>`), into the Markdown the desktop chat
 /// renders (`Hello **you**`). Content without HTML tags, such as messages sent
-/// from desktop, is returned unchanged.
+/// from desktop or angle brackets in code/generics, is returned unchanged.
 String htmlMessageToMarkdown(String content) {
-  if (!_htmlTag.hasMatch(content)) return content;
+  var hasKnownHtml = false;
+  for (final match in _htmlTag.allMatches(content)) {
+    if (_isKnownHtmlTag(match.group(2)!.toLowerCase())) {
+      hasKnownHtml = true;
+      break;
+    }
+  }
+  if (!hasKnownHtml) return _decodeEntities(content);
 
   final out = StringBuffer();
   // Ordered-list counters for the open lists; null marks a bullet list.
@@ -64,11 +173,15 @@ String htmlMessageToMarkdown(String content) {
 
   var index = 0;
   for (final match in _htmlTag.allMatches(content)) {
+    final tag = match.group(2)!.toLowerCase();
+    if (!_isKnownHtmlTag(tag)) {
+      continue;
+    }
+
     writeText(content.substring(index, match.start));
     index = match.end;
 
     final closing = match.group(1) == '/';
-    final tag = match.group(2)!.toLowerCase();
     final marker = _inlineMarkers[tag];
 
     if (marker != null) {
@@ -119,7 +232,12 @@ String _decodeEntities(String text) {
         name.substring(hex ? 2 : 1),
         radix: hex ? 16 : 10,
       );
-      if (code == null || code > 0x10FFFF) return match.group(0)!;
+      if (code == null ||
+          code <= 0 ||
+          code > 0x10FFFF ||
+          (code >= 0xD800 && code <= 0xDFFF)) {
+        return match.group(0)!;
+      }
       return String.fromCharCode(code);
     }
     return _namedEntities[name.toLowerCase()] ?? match.group(0)!;
