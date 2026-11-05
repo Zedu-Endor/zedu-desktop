@@ -1,10 +1,40 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+final _hiddenBlocks = RegExp(
+  r'<(script|style)\b[^>]*>[\s\S]*?</\1\s*>',
+  caseSensitive: false,
+);
+final _anyTag = RegExp(r'<[a-zA-Z/][^>]*>');
+final _anyEntity = RegExp(r'&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);');
+
+/// Turns a search hit's message content into readable text for the result
+/// list. Web and mobile send messages as HTML: tags are converted to the same
+/// Markdown the chat shows, script and style blocks are dropped instead of
+/// shown, entities are decoded, and each line becomes its own paragraph so
+/// separate lines are not run together. Plain text is returned unchanged.
+/// Nothing in the content is ever run.
+String searchResultText(String content) {
+  final visible = content.replaceAll(_hiddenBlocks, '');
+  if (_anyTag.hasMatch(visible)) {
+    final paragraphs = [
+      for (final line in htmlMessageToMarkdown(visible).split('\n'))
+        if (line.trim().isNotEmpty) line.trim(),
+    ];
+    return paragraphs.join('\n\n');
+  }
+  if (_anyEntity.hasMatch(visible)) return decodeHtmlEntities(visible);
+  return visible;
+}
+
 class SearchPanel extends StatefulWidget {
   final VoidCallback onClose;
 
-  const SearchPanel({super.key, required this.onClose});
+  /// Finds messages for a query. Without it the panel shows placeholder
+  /// results until it is connected to the search API (Ziki #62).
+  final Future<List<String>> Function(String query)? search;
+
+  const SearchPanel({super.key, required this.onClose, this.search});
 
   @override
   State<SearchPanel> createState() => _SearchPanelState();
@@ -34,6 +64,27 @@ class _SearchPanelState extends State<SearchPanel> {
       _isSearching = true;
       // Mock search delay
     });
+
+    final search = widget.search;
+    if (search != null) {
+      search(query).then(
+        (results) {
+          if (!mounted) return;
+          setState(() {
+            _isSearching = false;
+            _results = results;
+          });
+        },
+        onError: (Object _) {
+          if (!mounted) return;
+          setState(() {
+            _isSearching = false;
+            _results = [];
+          });
+        },
+      );
+      return;
+    }
 
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
@@ -138,7 +189,7 @@ class _SearchPanelState extends State<SearchPanel> {
                     itemBuilder: (context, index) {
                       return MessageBubble(
                         author: 'Jane Smith',
-                        text: _results[index],
+                        text: searchResultText(_results[index]),
                         timestamp: 'Yesterday',
                       );
                     },

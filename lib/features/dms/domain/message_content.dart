@@ -110,6 +110,10 @@ String htmlMessageToMarkdown(String content) {
   return out.toString().replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
 }
 
+/// Decodes HTML entities (`&amp;`, `&nbsp;`, `&#39;`) in plain text, leaving
+/// anything it doesn't recognise as it is.
+String decodeHtmlEntities(String text) => _decodeEntities(text);
+
 String _decodeEntities(String text) {
   return text.replaceAllMapped(_htmlEntity, (match) {
     final name = match.group(1)!;
