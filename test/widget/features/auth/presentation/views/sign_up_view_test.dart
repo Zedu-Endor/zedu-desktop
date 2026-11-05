@@ -207,6 +207,61 @@ void main() {
       expect(notifier.signUpCalls, 0);
     });
 
+    testWidgets('rejects a password missing an uppercase letter', (
+      tester,
+    ) async {
+      final notifier = FakeAuthNotifier();
+      await pumpDesktopSignUp(tester, notifier);
+      await fillValidForm(tester);
+      await tester.enterText(find.byType(TextFormField).at(2), 'record123');
+
+      await tester.ensureVisible(createAccountButton);
+      await tester.tap(createAccountButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Password must contain at least one uppercase letter'),
+        findsOneWidget,
+      );
+      expect(notifier.signUpCalls, 0);
+    });
+
+    testWidgets('rejects a password missing a lowercase letter', (
+      tester,
+    ) async {
+      final notifier = FakeAuthNotifier();
+      await pumpDesktopSignUp(tester, notifier);
+      await fillValidForm(tester);
+      await tester.enterText(find.byType(TextFormField).at(2), 'RECORD123');
+
+      await tester.ensureVisible(createAccountButton);
+      await tester.tap(createAccountButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Password must contain at least one lowercase letter'),
+        findsOneWidget,
+      );
+      expect(notifier.signUpCalls, 0);
+    });
+
+    testWidgets('rejects a password missing a number', (tester) async {
+      final notifier = FakeAuthNotifier();
+      await pumpDesktopSignUp(tester, notifier);
+      await fillValidForm(tester);
+      await tester.enterText(find.byType(TextFormField).at(2), 'RecordPass');
+
+      await tester.ensureVisible(createAccountButton);
+      await tester.tap(createAccountButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Password must contain at least one number'),
+        findsOneWidget,
+      );
+      expect(notifier.signUpCalls, 0);
+    });
+
     testWidgets('sends the password exactly as typed', (tester) async {
       String? sentPassword;
       await pumpDesktopSignUp(
