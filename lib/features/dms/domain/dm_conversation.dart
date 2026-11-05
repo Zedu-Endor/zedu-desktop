@@ -81,8 +81,7 @@ class DmConversation {
       previewMessage: json['preview_message'] as String? ?? '',
       previewThreads: threads,
       participants: participantsList,
-      unreadCount:
-          json['unread_count'] as int? ?? json['thread_count'] as int? ?? 0,
+      unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
     );
   }
 
