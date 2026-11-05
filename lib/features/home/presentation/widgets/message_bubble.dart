@@ -76,12 +76,18 @@ class _MessageBubbleState extends State<MessageBubble> {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        widget.author,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: colors.textPrimary,
+                      // A long name is cut short with "…" instead of pushing
+                      // the time out of narrow places such as the search panel.
+                      Flexible(
+                        child: Text(
+                          widget.author,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: colors.textPrimary,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
