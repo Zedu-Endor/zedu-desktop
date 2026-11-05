@@ -53,10 +53,13 @@ class WorkspaceSwitcherList extends ConsumerWidget {
                       icon: Icons.person_add_alt,
                       label: 'Invite',
                       onPressed: () {
-                        Navigator.pop(context);
+                        // Closing the menu deactivates this context, so open
+                        // the invite dialog from the navigator instead.
+                        final navigator = Navigator.of(context);
+                        navigator.pop();
                         showDialog<void>(
-                          context: context,
-                          builder: (context) => InviteTeammatesModal(),
+                          context: navigator.context,
+                          builder: (context) => const InviteTeammatesModal(),
                         );
                       },
                     ),
