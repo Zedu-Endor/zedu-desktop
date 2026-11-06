@@ -79,6 +79,8 @@ void main() {
     });
 
     final countryField = find.byType(TextFormField).last;
+    await tester.ensureVisible(countryField);
+    await tester.pumpAndSettle();
     await tester.tap(countryField);
     await tester.enterText(countryField, 'Nige');
     await tester.pumpAndSettle();
@@ -176,5 +178,134 @@ void main() {
       expect(calls, 2);
       expect(find.text('Edit your profile'), findsNothing);
     });
+  });
+
+  testWidgets('asks before canceling a changed profile', (tester) async {
+    await openDialog(tester, (_) async => null);
+
+    final nameField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Full Name'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(nameField, 'Grace Hopper');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsOneWidget);
+    expect(find.text('Edit your profile'), findsOneWidget);
+  });
+
+  testWidgets('asks before a barrier tap discards profile changes', (
+    tester,
+  ) async {
+    await openDialog(tester, (_) async => null);
+
+    final nameField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Full Name'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(nameField, 'Grace Hopper');
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsOneWidget);
+    expect(find.text('Edit your profile'), findsOneWidget);
+  });
+
+  testWidgets('asks before the close button discards profile changes', (
+    tester,
+  ) async {
+    await openDialog(tester, (_) async => null);
+
+    final nameField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Full Name'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(nameField, 'Grace Hopper');
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsOneWidget);
+    expect(find.text('Edit your profile'), findsOneWidget);
+  });
+
+  testWidgets('asks before Escape discards profile changes', (tester) async {
+    await openDialog(tester, (_) async => null);
+
+    final nameField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Full Name'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(nameField, 'Grace Hopper');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsOneWidget);
+    expect(find.text('Edit your profile'), findsOneWidget);
+  });
+
+  testWidgets('canceling discard keeps the changed profile open', (
+    tester,
+  ) async {
+    await openDialog(tester, (_) async => null);
+
+    final nameField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Full Name'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(nameField, 'Grace Hopper');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    final confirmation = find.byType(AlertDialog);
+    await tester.tap(
+      find.descendant(of: confirmation, matching: find.text('Cancel')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsNothing);
+    expect(find.text('Edit your profile'), findsOneWidget);
+    expect(find.text('Grace Hopper'), findsOneWidget);
+  });
+
+  testWidgets('confirmed discard closes the changed profile', (tester) async {
+    await openDialog(tester, (_) async => null);
+
+    final nameField = find.descendant(
+      of: find.widgetWithText(AppTextField, 'Full Name'),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(nameField, 'Grace Hopper');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsNothing);
+    expect(find.text('Edit your profile'), findsNothing);
+  });
+
+  testWidgets('cancel closes an unchanged profile without confirmation', (
+    tester,
+  ) async {
+    await openDialog(tester, (_) async => null);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsNothing);
+    expect(find.text('Edit your profile'), findsNothing);
+  });
+
+  testWidgets('barrier tap closes an unchanged profile without confirmation', (
+    tester,
+  ) async {
+    await openDialog(tester, (_) async => null);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsNothing);
+    expect(find.text('Edit your profile'), findsNothing);
   });
 }
