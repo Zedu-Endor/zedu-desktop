@@ -577,9 +577,9 @@ Future<void> _deleteFolder(
       .read(filesActionsProvider.notifier)
       .deleteFolder(folder);
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(error ?? 'Folder deleted')),
-  );
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(error ?? 'Folder deleted')));
 }
 
 /// Picks files and uploads them, showing progress on the button.

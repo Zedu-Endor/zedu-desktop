@@ -16,19 +16,22 @@ void main() {
       expect(member2.initial, 'C');
     });
 
-    test('preserves emojis and complex graphemes without UTF-16 surrogate corruption', () {
-      const emojiMember = OrgMember(id: '1', name: '😀 Ada');
-      expect(emojiMember.initial, '😀');
+    test(
+      'preserves emojis and complex graphemes without UTF-16 surrogate corruption',
+      () {
+        const emojiMember = OrgMember(id: '1', name: '😀 Ada');
+        expect(emojiMember.initial, '😀');
 
-      const rocketMember = OrgMember(id: '2', name: '🚀 Rocket');
-      expect(rocketMember.initial, '🚀');
+        const rocketMember = OrgMember(id: '2', name: '🚀 Rocket');
+        expect(rocketMember.initial, '🚀');
 
-      const flagMember = OrgMember(id: '3', name: '🇳🇬 Nigeria Team');
-      expect(flagMember.initial, '🇳🇬');
+        const flagMember = OrgMember(id: '3', name: '🇳🇬 Nigeria Team');
+        expect(flagMember.initial, '🇳🇬');
 
-      const technologistMember = OrgMember(id: '4', name: '👩‍💻 Coder');
-      expect(technologistMember.initial, '👩‍💻');
-    });
+        const technologistMember = OrgMember(id: '4', name: '👩‍💻 Coder');
+        expect(technologistMember.initial, '👩‍💻');
+      },
+    );
 
     test('handles whitespace and fallback', () {
       const emptyMember = OrgMember(id: '1');

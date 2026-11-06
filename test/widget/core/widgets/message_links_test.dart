@@ -149,12 +149,9 @@ void main() {
     });
 
     test('keeps formatted children inside the link', () {
-      final span = links.link(
-        '',
-        'https://example.com',
-        style,
-        [const TextSpan(text: '**docs**')],
-      );
+      final span = links.link('', 'https://example.com', style, [
+        const TextSpan(text: '**docs**'),
+      ]);
       expect(span.toPlainText(), '**docs**');
       expect(span.recognizer, isA<TapGestureRecognizer>());
     });

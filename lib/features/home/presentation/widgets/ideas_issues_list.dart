@@ -71,11 +71,7 @@ class _IdeasIssuesListState extends ConsumerState<IdeasIssuesList> {
               color: colors.error.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.error_outline,
-              color: colors.error,
-              size: 32,
-            ),
+            child: Icon(Icons.error_outline, color: colors.error, size: 32),
           ),
           const SizedBox(height: 16),
           Text(
@@ -96,9 +92,7 @@ class _IdeasIssuesListState extends ConsumerState<IdeasIssuesList> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _reload,
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.primary,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: colors.primary),
             child: const Text('Try again'),
           ),
         ],
@@ -119,11 +113,7 @@ class _IdeasIssuesListState extends ConsumerState<IdeasIssuesList> {
               color: colors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.inbox_outlined,
-              color: colors.primary,
-              size: 40,
-            ),
+            child: Icon(Icons.inbox_outlined, color: colors.primary, size: 40),
           ),
           const SizedBox(height: 20),
           Text(

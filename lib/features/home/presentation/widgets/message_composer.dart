@@ -372,9 +372,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     if (result != null) {
                       setState(() {
                         _attachedFiles.addAll(
-                          result.files
-                              .map((f) => f.path)
-                              .whereType<String>(),
+                          result.files.map((f) => f.path).whereType<String>(),
                         );
                       });
                     }
@@ -427,7 +425,9 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     ),
                   ),
                 ),
-                if (_controller.text.isEmpty && _attachedFiles.isEmpty && !_isRecording)
+                if (_controller.text.isEmpty &&
+                    _attachedFiles.isEmpty &&
+                    !_isRecording)
                   IconButton(
                     onPressed: _startRecording,
                     icon: Icon(Icons.mic_none, color: colors.textHint),

@@ -34,11 +34,7 @@ class OfflineStatusIndicator extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.wifi_off_rounded,
-                    size: 16,
-                    color: colors.error,
-                  ),
+                  Icon(Icons.wifi_off_rounded, size: 16, color: colors.error),
                   const SizedBox(width: 8),
                   Text(
                     'You are offline. Reconnecting...',

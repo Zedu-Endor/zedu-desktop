@@ -503,9 +503,7 @@ void main() {
         expect(notifier.lastRememberMe, ticked);
       });
 
-      testWidgets('passes Remember me =  to loginWithGoogle', (
-        tester,
-      ) async {
+      testWidgets('passes Remember me =  to loginWithGoogle', (tester) async {
         final notifier = FakeAuthNotifier();
         await pumpDesktopLogin(tester, notifier);
 
