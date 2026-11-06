@@ -255,14 +255,19 @@ class TeamMemberModel extends TeamMember {
       email: json['email'] as String? ?? 'anonymoususer@gmail.com',
       role: json['role'] as String? ?? 'Administrator',
       dateJoined: json['date_joined'] as String? ?? 'May 3, 2026',
-      status: _statusFromJson(json['status'] as String?),
+      status: statusFromJson(json),
       name: json['name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
     );
   }
 
-  static TeamMemberStatus _statusFromJson(String? value) {
-    return switch (value) {
+  /// Reads a member's status from an API record: `status` ("pending",
+  /// "inactive", any case), and `is_deactivated: true` counts as inactive.
+  /// Anything else is active.
+  static TeamMemberStatus statusFromJson(Map<String, dynamic> json) {
+    if (json['is_deactivated'] == true) return TeamMemberStatus.inactive;
+    final value = json['status'];
+    return switch (value is String ? value.trim().toLowerCase() : null) {
       'pending' => TeamMemberStatus.pending,
       'inactive' => TeamMemberStatus.inactive,
       _ => TeamMemberStatus.active,
