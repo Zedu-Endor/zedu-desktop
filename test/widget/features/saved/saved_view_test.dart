@@ -5,6 +5,8 @@ import '../../../helpers/helpers.dart';
 
 class MockSavedRepository extends Mock implements SavedRepository {}
 
+class MockReminderRepository extends Mock implements ReminderRepository {}
+
 final _now = DateTime(2026, 11, 6, 10);
 
 SavedMessage row({
@@ -14,8 +16,6 @@ SavedMessage row({
   String channelName = 'general',
   String channelType = 'public',
   DateTime? savedAt,
-  DateTime? remindAt,
-  bool overdue = false,
 }) => SavedMessage(
   id: id,
   target: SavedTarget(channelId: 'chan-$id', threadId: 'thread-$id'),
@@ -25,20 +25,28 @@ SavedMessage row({
   conversationName: channelName,
   channelType: channelType,
   savedAt: savedAt ?? _now.subtract(const Duration(hours: 1)),
+);
+
+MessageReminder reminderFor(String id, DateTime remindAt) => MessageReminder(
+  id: 'rem-$id',
+  channelId: 'chan-$id',
+  threadId: 'thread-$id',
   remindAt: remindAt,
-  overdue: overdue,
 );
 
 void main() {
   late MockSavedRepository repository;
+  late MockReminderRepository reminderRepository;
 
   setUp(() {
     repository = MockSavedRepository();
+    reminderRepository = MockReminderRepository();
   });
 
   Future<void> pumpView(
     WidgetTester tester, {
     List<SavedMessage>? items,
+    List<MessageReminder> pending = const [],
     Object? error,
   }) async {
     if (error != null) {
@@ -48,13 +56,17 @@ void main() {
     } else {
       when(
         () => repository.list(orgId: any(named: 'orgId')),
-      ).thenAnswer((_) async => SavedNotifier.sortForDisplay(items ?? []));
+      ).thenAnswer((_) async => items ?? []);
     }
+    when(
+      () => reminderRepository.list(orgId: any(named: 'orgId')),
+    ).thenAnswer((_) async => pending);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           savedRepositoryProvider.overrideWithValue(repository),
+          reminderRepositoryProvider.overrideWithValue(reminderRepository),
           currentOrgIdProvider.overrideWithValue('org-1'),
         ],
         child: buildTestMaterialApp(SavedView(now: _now)),
@@ -91,7 +103,8 @@ void main() {
   testWidgets('shows the reminder time on the row', (tester) async {
     await pumpView(
       tester,
-      items: [row(id: '1', remindAt: DateTime(2026, 11, 6, 15, 30))],
+      items: [row(id: '1')],
+      pending: [reminderFor('1', DateTime(2026, 11, 6, 15, 30))],
     );
 
     expect(
@@ -102,7 +115,7 @@ void main() {
     expect(find.textContaining('Today'), findsWidgets);
   });
 
-  testWidgets('an overdue row is labelled Due and sorts to the top', (
+  testWidgets('a reminder already past is labelled Due and sorts to the top', (
     tester,
   ) async {
     await pumpView(
@@ -117,9 +130,10 @@ void main() {
           id: 'due',
           author: 'Ada',
           savedAt: _now.subtract(const Duration(days: 3)),
-          remindAt: _now.subtract(const Duration(hours: 2)),
-          overdue: true,
         ),
+      ],
+      pending: [
+        reminderFor('due', _now.subtract(const Duration(hours: 2))),
       ],
     );
 
@@ -161,5 +175,20 @@ void main() {
 
     expect(find.text('Remove from saved'), findsOneWidget);
     expect(find.text('Remind me'), findsOneWidget);
+    expect(find.text('Cancel reminder'), findsNothing);
+  });
+
+  testWidgets('a row with a reminder can change or cancel it', (tester) async {
+    await pumpView(
+      tester,
+      items: [row(id: '1')],
+      pending: [reminderFor('1', DateTime(2026, 11, 6, 15, 30))],
+    );
+
+    await tester.tap(find.byTooltip('Saved message actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Change reminder'), findsOneWidget);
+    expect(find.text('Cancel reminder'), findsOneWidget);
   });
 }

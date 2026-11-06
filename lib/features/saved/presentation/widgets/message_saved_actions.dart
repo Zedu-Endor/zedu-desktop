@@ -7,6 +7,7 @@ class SavedMenuAction {
   static const save = 'saved.save';
   static const unsave = 'saved.unsave';
   static const remind = 'saved.remind';
+  static const clearReminder = 'saved.clearReminder';
 }
 
 /// How a reminder time reads to the user: the time alone today, the weekday
@@ -87,29 +88,46 @@ Future<bool> handleSavedMenuAction(
     case SavedMenuAction.remind:
       await promptForReminder(context, ref, target);
       return true;
+    case SavedMenuAction.clearReminder:
+      await clearReminder(context, ref, target);
+      return true;
     default:
       return false;
   }
 }
 
-/// Asks for a reminder time and sets it on the server.
+/// Asks which reminder time, and sets it on the server.
 Future<void> promptForReminder(
   BuildContext context,
   WidgetRef ref,
   SavedTarget target,
 ) async {
-  final when = await showReminderPicker(context);
-  if (when == null) return;
+  final preset = await showReminderPicker(context);
+  if (preset == null) return;
   if (!context.mounted) return;
 
-  final label = formatReminder(context, when);
+  final label = formatReminder(context, preset.resolve(DateTime.now()));
   await _run(
     context,
     () => ref
         .read(savedProvider.notifier)
-        .setReminder(target: target, remindAt: when),
+        .setReminder(target: target, preset: preset),
     success: "We'll remind you at $label.",
     failure: 'Could not set that reminder.',
+  );
+}
+
+/// Cancels the pending reminder on a message.
+Future<void> clearReminder(
+  BuildContext context,
+  WidgetRef ref,
+  SavedTarget target,
+) async {
+  await _run(
+    context,
+    () => ref.read(savedProvider.notifier).clearReminder(target),
+    success: 'Reminder cancelled.',
+    failure: 'Could not cancel that reminder.',
   );
 }
 
@@ -142,40 +160,24 @@ Future<void> _run(
   }
 }
 
-/// The preset and custom reminder choices.
-Future<DateTime?> showReminderPicker(BuildContext context) {
-  return showDialog<DateTime>(
+/// The reminder choices the server accepts.
+Future<ReminderPreset?> showReminderPicker(BuildContext context) {
+  return showDialog<ReminderPreset>(
     context: context,
     builder: (context) => const ReminderPickerDialog(),
   );
 }
 
+/// The reminder choices.
+///
+/// There is no custom time: the endpoint the web client uses accepts only
+/// these three presets and rejects anything else, and the server resolves
+/// them itself.
 class ReminderPickerDialog extends StatelessWidget {
   const ReminderPickerDialog({super.key, this.now});
 
   /// Injected by tests so the presets resolve against a known clock.
   final DateTime? now;
-
-  Future<void> _pickCustom(BuildContext context) async {
-    final start = now ?? DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: start,
-      firstDate: DateTime(start.year, start.month, start.day),
-      lastDate: DateTime(start.year + 2),
-    );
-    if (date == null || !context.mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(start.add(const Duration(hours: 1))),
-    );
-    if (time == null || !context.mounted) return;
-
-    Navigator.of(
-      context,
-    ).pop(DateTime(date.year, date.month, date.day, time.hour, time.minute));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -227,21 +229,8 @@ class ReminderPickerDialog extends StatelessWidget {
                             fontSize: 12,
                           ),
                         ),
-                        onTap: () =>
-                            Navigator.of(context).pop(preset.resolve(clock)),
+                        onTap: () => Navigator.of(context).pop(preset),
                       ),
-                    ListTile(
-                      dense: true,
-                      title: Text(
-                        'Custom',
-                        style: TextStyle(color: colors.textPrimary),
-                      ),
-                      trailing: Icon(
-                        Icons.chevron_right,
-                        color: colors.textSecondary,
-                      ),
-                      onTap: () => _pickCustom(context),
-                    ),
                   ],
                 ),
               ),

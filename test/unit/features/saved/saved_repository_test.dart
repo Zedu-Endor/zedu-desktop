@@ -53,15 +53,10 @@ void main() {
       expect(item.target.messageId, isNull);
       expect(item.kind, SavedMessageKind.thread);
       expect(item.authorName, 'Ada');
-      // The server reports the reminder in `overdue_time`, set whether or not
-      // it has passed.
-      expect(item.remindAt, isNotNull);
-      expect(item.remindAt!.toUtc(), DateTime.utc(2026, 11, 6, 9, 30));
-      expect(item.overdue, isFalse);
       expect(item.conversationLabel, '#general');
     });
 
-    test('marks a row overdue only when the server does', () async {
+    test('reads every row the server returns', () async {
       when(
         () => api.get<Map<String, dynamic>>(
           path: '/organisations/org-1/saved/message',
@@ -91,10 +86,9 @@ void main() {
 
       final items = await repository.list(orgId: 'org-1');
 
-      expect(items.first.overdue, isTrue);
-      expect(items.last.overdue, isFalse);
-      expect(items.last.remindAt, isNull);
-      expect(items.last.hasReminder, isFalse);
+      expect(items.map((e) => e.id), ['saved-1', 'saved-2']);
+      expect(items.first.authorName, 'Ada');
+      expect(items.last.authorName, 'Grace');
     });
 
     test('names a direct message without a hash, and drops rows with no id', () async {
@@ -207,75 +201,5 @@ void main() {
         path: '/organisations/org-1/saved/message/saved-42',
       ),
     ).called(1);
-  });
-
-  group('setReminder', () {
-    test('sends the chosen local time as UTC, typed thread', () async {
-      when(
-        () => api.put<Map<String, dynamic>>(
-          path: any(named: 'path'),
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer((_) async => ok());
-
-      // A time with a known UTC value whatever the machine's zone.
-      final chosen = DateTime.utc(2026, 11, 6, 15, 30).toLocal();
-
-      await repository.setReminder(
-        orgId: 'org-1',
-        target: const SavedTarget(channelId: 'chan-1', threadId: 'thread-1'),
-        remindAt: chosen,
-      );
-
-      final call = verify(
-        () => api.put<Map<String, dynamic>>(
-          path: captureAny(named: 'path'),
-          data: captureAny(named: 'data'),
-        ),
-      ).captured;
-      expect(call[0], '/organisations/org-1/set-remainder');
-
-      final body = call[1] as Map<String, dynamic>;
-      expect(body['type'], 'thread');
-      expect(body['channels_id'], 'chan-1');
-      expect(body['thread_id'], 'thread-1');
-      expect(body.containsKey('message_id'), isFalse);
-      expect(
-        DateTime.parse(body['remainder_at'] as String).toUtc(),
-        DateTime.utc(2026, 11, 6, 15, 30),
-      );
-      // The server stores and queues in UTC.
-      expect((body['remainder_at'] as String).endsWith('Z'), isTrue);
-    });
-
-    test('a reply is typed message and carries its id', () async {
-      when(
-        () => api.put<Map<String, dynamic>>(
-          path: any(named: 'path'),
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer((_) async => ok());
-
-      await repository.setReminder(
-        orgId: 'org-1',
-        target: const SavedTarget(
-          channelId: 'chan-1',
-          threadId: 'thread-1',
-          messageId: 'reply-7',
-        ),
-        remindAt: DateTime.utc(2026, 11, 6, 15, 30).toLocal(),
-      );
-
-      final body =
-          verify(
-                () => api.put<Map<String, dynamic>>(
-                  path: any(named: 'path'),
-                  data: captureAny(named: 'data'),
-                ),
-              ).captured.single
-              as Map<String, dynamic>;
-      expect(body['type'], 'message');
-      expect(body['message_id'], 'reply-7');
-    });
   });
 }

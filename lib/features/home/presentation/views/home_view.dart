@@ -763,10 +763,15 @@ class _SavedSidebarEntryState extends ConsumerState<_SavedSidebarEntry> {
       if (previous != next) _refresh();
     });
 
-    final overdue = ref
+    // Reminders already past their time but not yet delivered. The server
+    // drops a reminder from the list once it has fired, so this is the short
+    // window before delivery rather than a backlog.
+    final now = DateTime.now();
+    final due = ref
         .watch(savedProvider)
-        .items
-        .where((SavedMessage item) => item.overdue)
+        .reminders
+        .values
+        .where((MessageReminder reminder) => reminder.isDue(now))
         .length;
 
     return Padding(
@@ -798,7 +803,7 @@ class _SavedSidebarEntryState extends ConsumerState<_SavedSidebarEntry> {
                     ),
                   ),
                 ),
-                if (overdue > 0)
+                if (due > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
@@ -809,7 +814,7 @@ class _SavedSidebarEntryState extends ConsumerState<_SavedSidebarEntry> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '$overdue',
+                      '$due',
                       style: TextStyle(
                         color: colors.onPrimary,
                         fontSize: 10,

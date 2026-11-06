@@ -5,11 +5,11 @@ final savedRepositoryProvider = Provider<SavedRepository>((ref) {
   return SavedRepository(locator<ApiBaseService>());
 });
 
-/// The saved-message and reminder endpoints the web app already uses.
+/// The saved-message endpoints the web app already uses, so the saved list is
+/// shared between desktop and web.
 ///
-/// Reminders are set on the server, not on the device: the server stores the
-/// time and queues the job that sends the notification, so a reminder set here
-/// also shows on web and mobile and still fires with the desktop app closed.
+/// Reminders are not here: they are a separate resource on the server, in
+/// [ReminderRepository].
 class SavedRepository {
   SavedRepository(this._apiClient);
 
@@ -62,29 +62,6 @@ class SavedRepository {
   }) async {
     await _apiClient.delete<Map<String, dynamic>>(
       path: '/organisations/$orgId/saved/message/$savedMessageId',
-    );
-  }
-
-  /// Sets or changes the reminder on a saved message.
-  ///
-  /// [remindAt] is whatever local time the user picked; it is sent as UTC
-  /// because the server stores and queues in UTC. `type` follows the server's
-  /// own request model, which names the two kinds `thread` and `message`.
-  Future<void> setReminder({
-    required String orgId,
-    required SavedTarget target,
-    required DateTime remindAt,
-  }) async {
-    final messageId = target.messageId;
-    await _apiClient.put<Map<String, dynamic>>(
-      path: '/organisations/$orgId/set-remainder',
-      data: {
-        'type': target.kind.wire,
-        'channels_id': target.channelId,
-        'thread_id': target.threadId,
-        'message_id': ?messageId,
-        'remainder_at': remindAt.toUtc().toIso8601String(),
-      },
     );
   }
 }

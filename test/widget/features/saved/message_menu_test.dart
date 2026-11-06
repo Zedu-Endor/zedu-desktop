@@ -9,6 +9,8 @@ class MockSecureStorageService extends Mock implements SecureStorageService {}
 
 class MockSavedRepository extends Mock implements SavedRepository {}
 
+class MockReminderRepository extends Mock implements ReminderRepository {}
+
 class FakeSignedInAuthNotifier extends AuthNotifier {
   @override
   AuthState build() => AuthState(
@@ -42,6 +44,15 @@ SavedMessage savedRow({
   content: 'from them',
   savedAt: DateTime(2026, 11, 6, 8),
 );
+
+/// A reminder repository that reports nothing pending.
+MockReminderRepository emptyReminders() {
+  final repository = MockReminderRepository();
+  when(
+    () => repository.list(orgId: any(named: 'orgId')),
+  ).thenAnswer((_) async => <MessageReminder>[]);
+  return repository;
+}
 
 /// Loads the saved list, as the Home sidebar does when it mounts.
 Future<void> loadSaved(WidgetTester tester) async {
@@ -92,6 +103,7 @@ void main() {
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
             dmRepositoryProvider.overrideWithValue(repository),
             savedRepositoryProvider.overrideWithValue(savedRepository),
+            reminderRepositoryProvider.overrideWithValue(emptyReminders()),
             currentOrgIdProvider.overrideWithValue('org-1'),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
@@ -179,6 +191,7 @@ void main() {
         ProviderScope(
           overrides: [
             savedRepositoryProvider.overrideWithValue(savedRepository),
+            reminderRepositoryProvider.overrideWithValue(emptyReminders()),
             currentOrgIdProvider.overrideWithValue('org-1'),
           ],
           child: buildTestMaterialApp(
