@@ -139,7 +139,6 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Close',
                     icon: Icon(Icons.close, color: colors.textHint, size: 20),
                     splashRadius: 18,
                     onPressed: () => Navigator.of(context).pop(),
