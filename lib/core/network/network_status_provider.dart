@@ -7,7 +7,8 @@ enum NetworkStatus { online, offline }
 
 typedef ReachabilityChecker = Future<bool> Function();
 
-/// Provides a reachability check strategy. Defaults to resolving DNS via `InternetAddress.lookup`.
+/// Provides a reachability check strategy. Defaults to resolving DNS via
+/// `InternetAddress.lookup`.
 final reachabilityCheckerProvider = Provider<ReachabilityChecker>((ref) {
   return NetworkStatusNotifier.defaultReachabilityChecker;
 });
