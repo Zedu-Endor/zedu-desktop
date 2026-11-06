@@ -636,7 +636,12 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     if (path == null || !appRecordedPaths.remove(path)) return;
     try {
       await File(path).delete();
-    } catch (_) {}
+    } catch (error) {
+      AppLogger.d(
+        'Failed to delete temp recording $path: $error',
+        tag: 'DmMessageComposer',
+      );
+    }
   }
 
   String _formatSeconds(int total) {
