@@ -216,6 +216,18 @@ Future<void> openMemberChat(
 ) async {
   // A chat is already opening; let it finish.
   if (ref.read(peopleActionsProvider) != null) return;
+  // A deactivated account can't read or answer a DM: say so rather than
+  // "try again" (Ziki #2873).
+  if (member.deactivated) {
+    AppToastService.show(
+      context,
+      type: AppToastType.info,
+      message:
+          "${member.displayName}'s account is deactivated, so they can't "
+          'be messaged.',
+    );
+    return;
+  }
   final opened = await ref
       .read(peopleActionsProvider.notifier)
       .openChat(member);

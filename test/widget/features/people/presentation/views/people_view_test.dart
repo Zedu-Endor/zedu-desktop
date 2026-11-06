@@ -13,9 +13,10 @@ class _FakeWorkspaceNotifier extends WorkspaceNotifier {
 }
 
 class _FakePeopleRepository implements PeopleRepository {
-  _FakePeopleRepository({this.fail = false});
+  _FakePeopleRepository({this.fail = false, this.everyone = _everyone});
 
   final bool fail;
+  final List<OrgMember> everyone;
   final searches = <String>[];
 
   static const _everyone = [
@@ -37,7 +38,7 @@ class _FakePeopleRepository implements PeopleRepository {
   }) async {
     searches.add(search);
     if (fail) return const Failure(ApiFailure(message: 'offline'));
-    final members = _everyone
+    final members = everyone
         .where((m) => m.name.toLowerCase().contains(search.toLowerCase()))
         .toList();
     return Success(
@@ -152,5 +153,57 @@ void main() {
     expect(find.text('Could not load people'), findsOneWidget);
     expect(find.text('Could not load members.'), findsOneWidget);
     expect(find.text('Retry'), findsNWidgets(2));
+  });
+
+  group('deactivated members (Ziki #2873)', () {
+    final people = _FakePeopleRepository(
+      everyone: const [
+        OrgMember(
+          id: 'u-9',
+          name: 'Former Colleague',
+          email: 'gone@zedu.test',
+          online: true,
+          deactivated: true,
+        ),
+      ],
+    );
+
+    testWidgets('are labelled Deactivated, never Online', (tester) async {
+      await _pump(tester, people);
+
+      expect(find.text('Deactivated'), findsOneWidget);
+      expect(find.text('Online'), findsNothing);
+    });
+
+    testWidgets('clicking them explains instead of opening a DM', (
+      tester,
+    ) async {
+      final dms = await _pump(tester, people);
+
+      // Once on the card (the last match) and once in the sidebar.
+      for (final finder in [
+        find.text('Former Colleague').last,
+        find.text('Former Colleague').first,
+      ]) {
+        await tester.tap(finder);
+        await tester.pump();
+        expect(
+          find.text(
+            "Former Colleague's account is deactivated, so they can't be "
+            'messaged.',
+          ),
+          findsOneWidget,
+        );
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpAndSettle();
+      }
+
+      verifyNever(
+        () => dms.openConversation(
+          orgId: any(named: 'orgId'),
+          participantId: any(named: 'participantId'),
+        ),
+      );
+    });
   });
 }
