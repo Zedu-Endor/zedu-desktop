@@ -71,6 +71,40 @@ class _FakeAuthNotifier extends AuthNotifier {
   );
 }
 
+class _FakeDmListNotifier extends DmListNotifier {
+  _FakeDmListNotifier(this.conversations);
+
+  final List<DmConversation> conversations;
+
+  @override
+  Future<List<DmConversation>> build() async => conversations;
+}
+
+Future<void> _pumpDmPopoutCard(
+  WidgetTester tester,
+  List<DmConversation> conversations,
+) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        dmListProvider.overrideWith(() => _FakeDmListNotifier(conversations)),
+      ],
+      child: buildTestMaterialApp(
+        Scaffold(
+          body: SidebarPopoutCard(
+            HomeSidebarType.dms,
+            () {},
+            () {},
+            (_) {},
+            (_) {},
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 /// Hovers People in the real rail and returns how many times the profile was
 /// reloaded.
 Future<int> _hoverPeopleAndCountLoads(
@@ -186,5 +220,26 @@ void main() {
         expect(find.text('No people to show'), findsOneWidget);
       },
     );
+  });
+
+  group('Direct messages pop-out card', () {
+    testWidgets('keeps angle brackets and HTML in the DM preview', (
+      tester,
+    ) async {
+      await _pumpDmPopoutCard(tester, [
+        DmConversation(
+          channelId: 'c-1',
+          username: 'Ada',
+          participantId: 'p-1',
+          previewMessage:
+              '<p>Run <strong>npm test</strong> for List&lt;String&gt;</p>',
+          unreadCount: 1,
+        ),
+      ]);
+
+      expect(find.text('Ada'), findsOneWidget);
+      expect(find.text('Run npm test for List<String>'), findsOneWidget);
+      expect(find.text('<p>Run'), findsNothing);
+    });
   });
 }

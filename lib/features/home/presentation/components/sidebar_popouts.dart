@@ -13,6 +13,49 @@ const _transparent = Colors.transparent;
 const _cardWidth = 358.0;
 const _avatarSize = 36.0;
 
+/// Message previews can carry HTML from web or mobile senders and angle
+/// brackets that are content — generics like `List<String>`, emails like
+/// `<user@example.com>`, comparisons like `a < b`. Real HTML tags (names that
+/// start lowercase) are dropped; everything else is kept as typed.
+final RegExp _htmlTag = RegExp(r'</?[a-z][a-z0-9]*(?:\s[^>]*)?\s*/?>');
+final RegExp _htmlEntity = RegExp(r'&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);');
+
+const Map<String, String> _namedEntities = {
+  'amp': '&',
+  'lt': '<',
+  'gt': '>',
+  'quot': '"',
+  'apos': "'",
+  'nbsp': ' ',
+};
+
+/// Preview text for a DM row: real HTML tags become nothing, angle brackets
+/// that carry content survive, and HTML entities are decoded.
+String messagePreviewText(String content) {
+  final text = content.replaceAllMapped(_htmlEntity, (match) {
+    final entity = match.group(1)!;
+    if (entity.startsWith('#')) {
+      final hex = entity.length > 1 && (entity[1] == 'x' || entity[1] == 'X');
+      final code = int.tryParse(
+        hex ? entity.substring(2) : entity.substring(1),
+        radix: hex ? 16 : 10,
+      );
+      if (code == null ||
+          code <= 0 ||
+          code > 0x10FFFF ||
+          (code >= 0xD800 && code <= 0xDFFF)) {
+        return match.group(0)!;
+      }
+      return String.fromCharCode(code);
+    }
+    return _namedEntities[entity.toLowerCase()] ?? match.group(0)!;
+  });
+  return text
+      .replaceAllMapped(_htmlTag, (match) => '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
 abstract interface class SidebarPopoutController {
   void onRailHover(HomeSidebarType type, bool hovered);
 }
@@ -213,10 +256,7 @@ class SidebarPopoutCard extends ConsumerWidget {
       if (item is DmConversation) {
         return (
           item.displayName,
-          item.previewMessage
-              .replaceAll(RegExp(r'<[^>]*>'), '')
-              .replaceAll(RegExp(r'\s+'), ' ')
-              .trim(),
+          messagePreviewText(item.previewMessage),
           item.effectiveAvatarUrl,
           null,
           () => onConversationTap(item),
