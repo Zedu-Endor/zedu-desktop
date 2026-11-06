@@ -73,6 +73,24 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
   late String selectedTimezone;
   late String selectedCountry;
+  bool _confirmingDiscard = false;
+
+  bool get _isDirty {
+    final initialTimezone = widget.account.timezone.isNotEmpty
+        ? widget.account.timezone
+        : _kTimezones.first;
+    return nameCtrl.text.trim() != widget.account.name.trim() ||
+        displayNameCtrl.text.trim() != widget.account.displayName.trim() ||
+        usernameCtrl.text.trim() != widget.account.username.trim() ||
+        emailCtrl.text.trim() != widget.account.email.trim() ||
+        phoneCtrl.text.trim() != widget.account.phoneNumber.trim() ||
+        titleCtrl.text.trim() != widget.account.title.trim() ||
+        pronunciationCtrl.text.trim() !=
+            widget.account.namePronunciation.trim() ||
+        selectedTimezone != initialTimezone ||
+        _canonicalCountryName(selectedCountry) !=
+            _canonicalCountryName(widget.account.country);
+  }
 
   @override
   void initState() {
@@ -105,11 +123,35 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     super.dispose();
   }
 
+  Future<void> _maybeClose() async {
+    if (!mounted) return;
+    if (!_isDirty) {
+      Navigator.pop(context);
+      return;
+    }
+    if (_confirmingDiscard) return;
+    _confirmingDiscard = true;
+    try {
+      await showProfileConfirmDialog(
+        context,
+        title: 'Discard changes?',
+        message: 'Your profile changes have not been saved.',
+        confirmLabel: 'Discard',
+        destructive: true,
+        onConfirm: () async {
+          if (mounted) Navigator.pop(context);
+        },
+      );
+    } finally {
+      _confirmingDiscard = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
+    final dialog = Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
         width: 640,
@@ -134,7 +176,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _maybeClose,
                     icon: Icon(Icons.close, color: colors.textHint),
                   ),
                 ],
@@ -489,7 +531,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _maybeClose,
                     child: Text(
                       'Cancel',
                       style: TextStyle(color: colors.textPrimary),
@@ -525,6 +567,14 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           ],
         ),
       ),
+    );
+    // Route-level exits (scrim, Escape and system back) use the same guard.
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _maybeClose();
+      },
+      child: dialog,
     );
   }
 }
