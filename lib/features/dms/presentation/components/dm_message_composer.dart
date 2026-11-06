@@ -587,7 +587,12 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     _recordTimer?.cancel();
     try {
       await _deleteRecording(await _audioRecorder.stop());
-    } catch (_) {}
+    } catch (error) {
+      AppLogger.d(
+        'Failed to stop the cancelled voice recording: $error',
+        tag: 'DmMessageComposer',
+      );
+    }
     _activeRecordingPath = null;
     if (mounted) setState(() => _isRecording = false);
   }
