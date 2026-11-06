@@ -62,6 +62,13 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
     }
   }
 
+  void _toggleSidebar() {
+    final signedIn =
+        ref.read(authNotifierProvider).status == AuthStatus.authenticated;
+    if (!signedIn) return;
+    ref.read(homeSidebarVisibleProvider.notifier).toggle();
+  }
+
   void _openEntry(QuickSwitcherEntry entry) {
     final conversation = entry.conversation;
     if (conversation == null) {
@@ -92,6 +99,10 @@ class _QuickSwitcherShortcutState extends ConsumerState<QuickSwitcherShortcut> {
             _showShortcuts,
         const SingleActivator(LogicalKeyboardKey.slash, meta: true):
             _showShortcuts,
+        const SingleActivator(LogicalKeyboardKey.backslash, control: true):
+            _toggleSidebar,
+        const SingleActivator(LogicalKeyboardKey.backslash, meta: true):
+            _toggleSidebar,
       },
       child: widget.child,
     );

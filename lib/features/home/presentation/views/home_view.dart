@@ -31,6 +31,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     });
     final colors = context.colors;
     final showProfile = ref.watch(personalProfilePanelProvider);
+    final sidebarVisible = ref.watch(homeSidebarVisibleProvider);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -41,7 +42,19 @@ class _HomeViewState extends ConsumerState<HomeView> {
             child: Row(
               children: [
                 AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
-                ResizableSidebar(child: const _MainSidebarSwitcher()),
+                AnimatedSize(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  alignment: Alignment.centerLeft,
+                  child: sidebarVisible
+                      ? ResizableSidebar(child: const _MainSidebarSwitcher())
+                      : const SizedBox(
+                          key: ValueKey('home-sidebar-hidden'),
+                          width: 0,
+                        ),
+                ),
                 Expanded(
                   child: Stack(
                     children: [
@@ -80,6 +93,8 @@ class _HomeAppBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
+          const _SidebarToggleButton(),
+          const SizedBox(width: 8),
           Text(
             'Zedu',
             style: TextStyle(
@@ -123,6 +138,31 @@ class _HomeAppBar extends ConsumerWidget {
           const Spacer(),
         ],
       ),
+    );
+  }
+}
+
+/// Hides or shows the home sidebar; Cmd/Ctrl+\ does the same (Ziki #2848).
+class _SidebarToggleButton extends ConsumerWidget {
+  const _SidebarToggleButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final visible = ref.watch(homeSidebarVisibleProvider);
+    final modifier = defaultTargetPlatform == TargetPlatform.macOS
+        ? 'Cmd'
+        : 'Ctrl';
+    final label = visible ? 'Hide sidebar' : 'Show sidebar';
+    return IconButton(
+      key: const ValueKey('home-sidebar-toggle'),
+      tooltip: '$label ($modifier+\\)',
+      onPressed: () => ref.read(homeSidebarVisibleProvider.notifier).toggle(),
+      icon: Icon(
+        visible ? Icons.view_sidebar_outlined : Icons.view_sidebar,
+        color: context.colors.onPrimary,
+        size: 18,
+      ),
+      visualDensity: VisualDensity.compact,
     );
   }
 }
