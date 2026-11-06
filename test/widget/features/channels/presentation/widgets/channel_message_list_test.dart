@@ -21,6 +21,9 @@ class FakeChatHistoryNotifier extends ChangeNotifier
   @override
   String? get currentUserAvatarUrl => null;
 
+  @override
+  String get currentUserId => 'me-1';
+
   String? retriedMessageId;
 
   @override
@@ -251,6 +254,146 @@ void main() {
       // Nothing is above the divider: it is above the oldest loaded message.
       final dividerY = tester.getTopLeft(find.text(divider)).dy;
       expect(dividerY, lessThan(tester.getTopLeft(find.text('msg 1')).dy));
+    });
+  });
+
+  group('editing and deleting own messages (Ziki #2839)', () {
+    const mine = ChannelMessage(
+      senderName: 'Test User',
+      text: 'my typo',
+      threadId: 't-1',
+      userId: 'me-1',
+    );
+    const theirs = ChannelMessage(
+      senderName: 'Ada',
+      text: 'not yours',
+      threadId: 't-2',
+      userId: 'u-2',
+    );
+    final actions = find.byKey(const ValueKey('channel-message-actions'));
+
+    setUp(() {
+      when(
+        () => repository.editChannelMessage(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+          content: any(named: 'content'),
+        ),
+      ).thenAnswer((_) async => const Success(null));
+      when(
+        () => repository.deleteChannelMessage(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+        ),
+      ).thenAnswer((_) async => const Success(null));
+    });
+
+    testWidgets('only your own messages get the actions menu', (tester) async {
+      await pumpList(tester, const Success([mine, theirs]));
+
+      expect(actions, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('my typo'),
+            matching: find.byType(ChannelMessageTile),
+          ),
+          matching: actions,
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Edit saves the new text and reloads the channel', (
+      tester,
+    ) async {
+      await pumpList(tester, const Success([mine]));
+
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit message'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('channel-message-edit-field')),
+        'fixed text',
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => repository.editChannelMessage(
+          channelId: 'ch-1',
+          threadId: 't-1',
+          content: 'fixed text',
+        ),
+      ).called(1);
+      verify(() => repository.fetchChannelMessages('ch-1')).called(2);
+    });
+
+    testWidgets('Delete asks first, then deletes and reloads', (tester) async {
+      await pumpList(tester, const Success([mine]));
+
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete message'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete message?'), findsOneWidget);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () =>
+            repository.deleteChannelMessage(channelId: 'ch-1', threadId: 't-1'),
+      ).called(1);
+      verify(() => repository.fetchChannelMessages('ch-1')).called(2);
+    });
+
+    testWidgets('cancelling the delete changes nothing', (tester) async {
+      await pumpList(tester, const Success([mine]));
+
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete message'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      verifyNever(
+        () => repository.deleteChannelMessage(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+        ),
+      );
+    });
+
+    testWidgets('a failed edit says so', (tester) async {
+      when(
+        () => repository.editChannelMessage(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+          content: any(named: 'content'),
+        ),
+      ).thenAnswer((_) async => const Failure(ApiFailure(message: 'offline')));
+      await pumpList(tester, const Success([mine]));
+
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit message'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('channel-message-edit-field')),
+        'fixed text',
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+
+      expect(
+        find.text("Couldn't edit the message. Please try again."),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
     });
   });
 }

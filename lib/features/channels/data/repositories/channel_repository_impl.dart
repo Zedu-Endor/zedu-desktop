@@ -77,6 +77,44 @@ class ChannelRepositoryImpl implements ChannelRepository {
   }
 
   @override
+  Future<Result<void>> editChannelMessage({
+    required String channelId,
+    required String threadId,
+    required String content,
+  }) async {
+    try {
+      await remoteDataSource.editChannelMessage(
+        channelId: channelId,
+        threadId: threadId,
+        content: content,
+      );
+      return const Success(null);
+    } on ApiFailure catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(ApiFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Result<void>> deleteChannelMessage({
+    required String channelId,
+    required String threadId,
+  }) async {
+    try {
+      await remoteDataSource.deleteChannelMessage(
+        channelId: channelId,
+        threadId: threadId,
+      );
+      return const Success(null);
+    } on ApiFailure catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(ApiFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Result<void>> leaveChannel(String channelId) async {
     try {
       await remoteDataSource.leaveChannel(channelId);

@@ -8,6 +8,12 @@ class ChannelMessage {
   final DateTime? createdAt;
   final String? status;
 
+  /// The message's thread id, which the edit and delete routes take.
+  final String? threadId;
+
+  /// Who sent it, so the current user's own messages can be edited.
+  final String? userId;
+
   const ChannelMessage({
     this.id,
     required this.senderName,
@@ -15,6 +21,8 @@ class ChannelMessage {
     this.avatarUrl,
     this.createdAt,
     this.status,
+    this.threadId,
+    this.userId,
   });
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
@@ -45,6 +53,8 @@ class ChannelMessage {
         json['created_at']?.toString() ?? '',
       )?.toLocal(),
       status: json['status']?.toString(),
+      threadId: nonEmpty(json['thread_id']) ?? nonEmpty(json['id']),
+      userId: nonEmpty(json['user_id']),
     );
   }
 

@@ -29,6 +29,19 @@ abstract class ChannelRemoteDataSource {
   /// The latest messages of a channel, newest first.
   Future<List<ChannelMessage>> fetchChannelMessages(String channelId);
 
+  /// Replaces the text of the message with [threadId] in [channelId].
+  Future<void> editChannelMessage({
+    required String channelId,
+    required String threadId,
+    required String content,
+  });
+
+  /// Deletes the message with [threadId] in [channelId].
+  Future<void> deleteChannelMessage({
+    required String channelId,
+    required String threadId,
+  });
+
   /// Stars the channel for this user, or unstars it if it is already starred.
   /// Returns whether it is starred now.
   Future<bool> toggleStarChannel({
@@ -170,6 +183,28 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     await apiBaseService.post<Map<String, dynamic>>(
       path: '/channels/add-multiple',
       data: {'channel_id': channelId, 'user_ids': userIds},
+    );
+  }
+
+  @override
+  Future<void> editChannelMessage({
+    required String channelId,
+    required String threadId,
+    required String content,
+  }) async {
+    await apiBaseService.put<Map<String, dynamic>>(
+      path: '/threads/$threadId/channels/$channelId',
+      data: {'content': content},
+    );
+  }
+
+  @override
+  Future<void> deleteChannelMessage({
+    required String channelId,
+    required String threadId,
+  }) async {
+    await apiBaseService.delete<Map<String, dynamic>>(
+      path: '/threads/$threadId/channels/$channelId',
     );
   }
 

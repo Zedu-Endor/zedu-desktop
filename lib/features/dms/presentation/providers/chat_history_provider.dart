@@ -51,6 +51,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
     return authState.user?.id ?? '';
   }
 
+  /// The signed-in user's id, or '' when signed out.
+  String get currentUserId => _currentUserId;
+
   String get currentUserName {
     final user = ref.read(authNotifierProvider).user;
     if (user == null) return 'You';

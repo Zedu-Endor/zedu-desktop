@@ -43,6 +43,77 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
 
   String get channelId => widget.channelId;
 
+  /// Asks for the new text of [message] and saves it (Ziki #2839).
+  Future<void> _editMessage(ChannelMessage message) async {
+    final threadId = message.threadId;
+    if (threadId == null) return;
+    final edited = await showDialog<String>(
+      context: context,
+      builder: (_) => _EditChannelMessageDialog(initialText: message.text),
+    );
+    if (!mounted || edited == null) return;
+    final text = edited.trim();
+    if (text.isEmpty || text == message.text) return;
+    final result = await ref
+        .read(channelRepositoryProvider)
+        .editChannelMessage(
+          channelId: channelId,
+          threadId: threadId,
+          content: text,
+        );
+    if (!mounted) return;
+    switch (result) {
+      case Success():
+        ref.invalidate(channelHistoryProvider(channelId));
+      case Failure():
+        AppToastService.show(
+          context,
+          type: AppToastType.error,
+          message: "Couldn't edit the message. Please try again.",
+        );
+    }
+  }
+
+  /// Confirms, then deletes [message] for everyone (Ziki #2839).
+  Future<void> _deleteMessage(ChannelMessage message) async {
+    final threadId = message.threadId;
+    if (threadId == null) return;
+    final colors = context.colors;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete message?'),
+        content: const Text('It will be removed for everyone in the channel.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: colors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    final result = await ref
+        .read(channelRepositoryProvider)
+        .deleteChannelMessage(channelId: channelId, threadId: threadId);
+    if (!mounted) return;
+    switch (result) {
+      case Success():
+        ref.invalidate(channelHistoryProvider(channelId));
+      case Failure():
+        AppToastService.show(
+          context,
+          type: AppToastType.error,
+          message: "Couldn't delete the message. Please try again.",
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatHistory = ref.watch(chatHistoryProvider(channelId));
@@ -145,6 +216,17 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
     int serverCount = 0,
   }) {
     final firstUnread = _firstUnreadIndex(pendingCount, serverCount);
+    // Read only when a message names its sender, so lists without sender ids
+    // never touch the signed-in user.
+    String? me;
+    bool isMine(ChannelMessage message) {
+      final sender = message.userId;
+      if (sender == null || message.threadId == null) return false;
+      if (message.status != null) return false;
+      me ??= ref.read(chatHistoryProvider(channelId)).currentUserId;
+      return me!.isNotEmpty && sender == me;
+    }
+
     final offerJump =
         firstUnread != null &&
         !_jumped &&
@@ -157,6 +239,8 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
+        // Only the sender's own, already sent messages can be changed.
+        final own = isMine(message);
         final tile = ChannelMessageTile(
           message: message,
           onRetry: message.id != null
@@ -164,6 +248,8 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
                     .read(chatHistoryProvider(channelId))
                     .retryMessage(message.id!)
               : null,
+          onEdit: own ? () => _editMessage(message) : null,
+          onDelete: own ? () => _deleteMessage(message) : null,
         );
         if (index != firstUnread) return tile;
         return Column(
@@ -230,10 +316,22 @@ class _UnreadDivider extends StatelessWidget {
 }
 
 class ChannelMessageTile extends StatelessWidget {
-  const ChannelMessageTile({super.key, required this.message, this.onRetry});
+  const ChannelMessageTile({
+    super.key,
+    required this.message,
+    this.onRetry,
+    this.onEdit,
+    this.onDelete,
+  });
 
   final ChannelMessage message;
   final VoidCallback? onRetry;
+
+  /// Set for the current user's own messages; shows Edit in the menu.
+  final VoidCallback? onEdit;
+
+  /// Set for the current user's own messages; shows Delete in the menu.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -262,26 +360,35 @@ class ChannelMessageTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text.rich(
-                  TextSpan(
-                    text: message.senderName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: colors.textPrimary,
-                    ),
-                    children: [
-                      if (time != null)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text.rich(
                         TextSpan(
-                          text:
-                              '  ${TimeOfDay.fromDateTime(time).format(context)}',
+                          text: message.senderName,
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.normal,
-                            color: colors.textSecondary,
+                            fontWeight: FontWeight.bold,
+                            color: colors.textPrimary,
                           ),
+                          children: [
+                            if (time != null)
+                              TextSpan(
+                                text:
+                                    '  ${TimeOfDay.fromDateTime(time).format(context)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.normal,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                    if (onEdit != null || onDelete != null)
+                      _OwnMessageMenu(onEdit: onEdit, onDelete: onDelete),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 ReportMessageMenu(
@@ -335,6 +442,99 @@ class ChannelMessageTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Edit and Delete for the current user's own channel message.
+class _OwnMessageMenu extends StatelessWidget {
+  const _OwnMessageMenu({this.onEdit, this.onDelete});
+
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return SizedBox(
+      width: 28,
+      height: 20,
+      child: PopupMenuButton<String>(
+        key: const ValueKey('channel-message-actions'),
+        tooltip: 'Message actions',
+        padding: EdgeInsets.zero,
+        iconSize: 18,
+        icon: Icon(Icons.more_horiz, color: colors.textSecondary),
+        onSelected: (value) {
+          if (value == 'edit') onEdit?.call();
+          if (value == 'delete') onDelete?.call();
+        },
+        itemBuilder: (_) => [
+          if (onEdit != null)
+            const PopupMenuItem(value: 'edit', child: Text('Edit message')),
+          if (onDelete != null)
+            PopupMenuItem(
+              value: 'delete',
+              child: Text(
+                'Delete message',
+                style: TextStyle(color: colors.error),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Edits a channel message's text; pops the new text, or null on Cancel.
+class _EditChannelMessageDialog extends StatefulWidget {
+  const _EditChannelMessageDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_EditChannelMessageDialog> createState() =>
+      _EditChannelMessageDialogState();
+}
+
+class _EditChannelMessageDialogState extends State<_EditChannelMessageDialog> {
+  late final _controller = TextEditingController(text: widget.initialText);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit message'),
+      content: SizedBox(
+        width: 420,
+        child: TextField(
+          key: const ValueKey('channel-message-edit-field'),
+          controller: _controller,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 6,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (context, value, _) => FilledButton(
+            onPressed: value.text.trim().isEmpty
+                ? null
+                : () => Navigator.of(context).pop(_controller.text),
+            child: const Text('Save'),
+          ),
+        ),
+      ],
     );
   }
 }
