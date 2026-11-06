@@ -51,11 +51,9 @@ class SavedTarget {
 
 /// One row of the Saved list, as the server reports it.
 ///
-/// The reminder time arrives as `overdue_time`, which the server sets to the
-/// stored reminder whether or not it has passed; `overdue` is the server's own
-/// judgement that it has. Both are read from the server rather than compared
-/// against the device clock, so a row cannot disagree with the notification
-/// the server will send.
+/// A row carries no reminder of its own. Reminders are a separate resource
+/// (see [MessageReminder]), the one the web client uses, and a row is matched
+/// to its pending reminder by [SavedTarget.key].
 class SavedMessage {
   const SavedMessage({
     required this.id,
@@ -67,8 +65,6 @@ class SavedMessage {
     this.avatarUrl,
     this.conversationName,
     this.channelType,
-    this.remindAt,
-    this.overdue = false,
   });
 
   /// The saved item's own id. Removing uses this, not the thread id, which
@@ -87,14 +83,6 @@ class SavedMessage {
 
   /// `dm`, `groupDM`, `public` or `private`.
   final String? channelType;
-
-  /// The reminder set on this item, if any.
-  final DateTime? remindAt;
-
-  /// The server's own judgement that the reminder has passed.
-  final bool overdue;
-
-  bool get hasReminder => remindAt != null;
 
   bool get isDirectMessage => channelType == 'dm' || channelType == 'groupDM';
 
@@ -149,8 +137,6 @@ class SavedMessage {
       channelType: _string(json['channel_type']).isEmpty
           ? null
           : _string(json['channel_type']),
-      remindAt: _parseTime(json['overdue_time']),
-      overdue: json['overdue'] == true,
     );
   }
 }

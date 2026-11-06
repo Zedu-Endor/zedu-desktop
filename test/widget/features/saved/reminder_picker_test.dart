@@ -7,15 +7,15 @@ void main() {
   // A Friday at 10:00, so "tomorrow at 9" is unambiguous.
   final now = DateTime(2026, 11, 6, 10);
 
-  Future<DateTime?> openPicker(WidgetTester tester) async {
-    DateTime? chosen;
+  Future<ReminderPreset?> openPicker(WidgetTester tester) async {
+    ReminderPreset? chosen;
     await tester.pumpWidget(
       ProviderScope(
         child: buildTestMaterialApp(
           Builder(
             builder: (context) => ElevatedButton(
               onPressed: () async {
-                chosen = await showDialog<DateTime>(
+                chosen = await showDialog<ReminderPreset>(
                   context: context,
                   builder: (_) => ReminderPickerDialog(now: now),
                 );
@@ -31,13 +31,16 @@ void main() {
     return chosen;
   }
 
-  testWidgets('offers the four choices the ticket asks for', (tester) async {
+  testWidgets('offers the three choices the server accepts', (tester) async {
     await openPicker(tester);
 
     expect(find.text('In 30 minutes'), findsOneWidget);
     expect(find.text('In 1 hour'), findsOneWidget);
     expect(find.text('Tomorrow at 9:00 AM'), findsOneWidget);
-    expect(find.text('Custom'), findsOneWidget);
+    // The endpoint the web client uses validates
+    // `oneof=30_min 1_hour tomorrow_9am` and rejects anything else, so there
+    // is no custom time to offer.
+    expect(find.text('Custom'), findsNothing);
   });
 
   testWidgets('In 30 minutes resolves against the current time', (
@@ -68,22 +71,11 @@ void main() {
     expect(find.text('In 30 minutes'), findsNothing);
   });
 
-  test('the presets resolve to the times they name', () {
-    expect(
-      ReminderPreset.inThirtyMinutes.resolve(now),
-      DateTime(2026, 11, 6, 10, 30),
-    );
-    expect(ReminderPreset.inOneHour.resolve(now), DateTime(2026, 11, 6, 11));
-    expect(
-      ReminderPreset.tomorrowMorning.resolve(now),
-      DateTime(2026, 11, 7, 9),
-    );
-  });
+  testWidgets('choosing one returns that preset to the caller', (tester) async {
+    await openPicker(tester);
+    await tester.tap(find.text('In 1 hour'));
+    await tester.pumpAndSettle();
 
-  test('tomorrow morning rolls over a month end', () {
-    expect(
-      ReminderPreset.tomorrowMorning.resolve(DateTime(2026, 11, 30, 23, 50)),
-      DateTime(2026, 12, 1, 9),
-    );
+    expect(find.text('In 1 hour'), findsNothing);
   });
 }

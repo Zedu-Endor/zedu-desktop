@@ -96,7 +96,14 @@ class _SavedViewState extends ConsumerState<SavedView> {
       itemCount: saved.items.length,
       separatorBuilder: (_, _) =>
           Divider(height: 1, color: context.colors.borderOutline),
-      itemBuilder: (_, index) => SavedRow(item: saved.items[index], now: now),
+      itemBuilder: (_, index) {
+        final item = saved.items[index];
+        return SavedRow(
+          item: item,
+          reminder: saved.reminderFor(item.target),
+          now: now,
+        );
+      },
     );
   }
 }

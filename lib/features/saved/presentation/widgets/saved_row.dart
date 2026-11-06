@@ -3,9 +3,12 @@ import 'package:zedu/features/features.dart';
 
 /// One saved message. Tapping it opens the conversation it came from.
 class SavedRow extends ConsumerWidget {
-  const SavedRow({super.key, required this.item, this.now});
+  const SavedRow({super.key, required this.item, this.reminder, this.now});
 
   final SavedMessage item;
+
+  /// The pending reminder on this message, when there is one.
+  final MessageReminder? reminder;
 
   /// Injected by tests so "Today" and "Tomorrow" are stable.
   final DateTime? now;
@@ -61,10 +64,6 @@ class SavedRow extends ConsumerWidget {
     WidgetRef ref,
     String value,
   ) async {
-    if (value == SavedMenuAction.unsave) {
-      await handleSavedMenuAction(context, ref, value, item.target);
-      return;
-    }
     await handleSavedMenuAction(context, ref, value, item.target);
   }
 
@@ -72,7 +71,8 @@ class SavedRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final avatarUrl = item.avatarUrl;
-    final remindAt = item.remindAt;
+    final remindAt = reminder?.remindAt;
+    final due = reminder?.isDue(now ?? DateTime.now()) ?? false;
 
     return InkWell(
       onTap: () => _open(context, ref),
@@ -123,7 +123,7 @@ class SavedRow extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      if (item.overdue) ...[
+                      if (due) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -165,17 +165,15 @@ class SavedRow extends ConsumerWidget {
                         Icon(
                           Icons.alarm,
                           size: 12,
-                          color: item.overdue ? colors.error : colors.textHint,
+                          color: due ? colors.error : colors.textHint,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           'Reminder: ${formatReminder(context, remindAt, now: now)}',
                           style: TextStyle(
-                            color: item.overdue
-                                ? colors.error
-                                : colors.textHint,
+                            color: due ? colors.error : colors.textHint,
                             fontSize: 11,
-                            fontWeight: item.overdue
+                            fontWeight: due
                                 ? FontWeight.bold
                                 : FontWeight.normal,
                           ),
@@ -195,10 +193,17 @@ class SavedRow extends ConsumerWidget {
                   value: SavedMenuAction.unsave,
                   child: Text('Remove from saved'),
                 ),
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: SavedMenuAction.remind,
-                  child: Text('Remind me'),
+                  child: Text(
+                    reminder == null ? 'Remind me' : 'Change reminder',
+                  ),
                 ),
+                if (reminder != null)
+                  const PopupMenuItem<String>(
+                    value: SavedMenuAction.clearReminder,
+                    child: Text('Cancel reminder'),
+                  ),
               ],
             ),
           ],

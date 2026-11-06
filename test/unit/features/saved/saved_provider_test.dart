@@ -5,14 +5,14 @@ import '../../../helpers/helpers.dart';
 
 class MockSavedRepository extends Mock implements SavedRepository {}
 
+class MockReminderRepository extends Mock implements ReminderRepository {}
+
 SavedMessage item({
   required String id,
   String channelId = 'c1',
   String threadId = 't1',
   String? messageId,
   DateTime? savedAt,
-  DateTime? remindAt,
-  bool overdue = false,
 }) => SavedMessage(
   id: id,
   target: SavedTarget(
@@ -24,50 +24,76 @@ SavedMessage item({
   authorName: 'Ada',
   content: 'hello',
   savedAt: savedAt ?? DateTime.utc(2026, 11, 6, 8),
-  remindAt: remindAt,
-  overdue: overdue,
+);
+
+MessageReminder reminder({
+  String id = 'rem-1',
+  String channelId = 'c1',
+  String threadId = 't1',
+  String? messageId,
+  DateTime? remindAt,
+}) => MessageReminder(
+  id: id,
+  channelId: channelId,
+  threadId: threadId,
+  messageId: messageId,
+  remindAt: remindAt ?? DateTime(2026, 11, 6, 15),
 );
 
 void main() {
-  late MockSavedRepository repository;
+  late MockSavedRepository saved;
+  late MockReminderRepository reminders;
 
   setUpAll(() {
-    registerFallbackValue(
-      const SavedTarget(channelId: 'c', threadId: 't'),
-    );
+    registerFallbackValue(const SavedTarget(channelId: 'c', threadId: 't'));
+    registerFallbackValue(ReminderPreset.inOneHour);
   });
 
   setUp(() {
-    repository = MockSavedRepository();
+    saved = MockSavedRepository();
+    reminders = MockReminderRepository();
+
     when(
-      () => repository.save(
-        orgId: any(named: 'orgId'),
-        target: any(named: 'target'),
-      ),
+      () => saved.save(orgId: any(named: 'orgId'), target: any(named: 'target')),
     ).thenAnswer((_) async {});
     when(
-      () => repository.setReminder(
-        orgId: any(named: 'orgId'),
-        target: any(named: 'target'),
-        remindAt: any(named: 'remindAt'),
-      ),
-    ).thenAnswer((_) async {});
-    when(
-      () => repository.remove(
+      () => saved.remove(
         orgId: any(named: 'orgId'),
         savedMessageId: any(named: 'savedMessageId'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => reminders.create(
+        orgId: any(named: 'orgId'),
+        target: any(named: 'target'),
+        preset: any(named: 'preset'),
+        tzOffsetMinutes: any(named: 'tzOffsetMinutes'),
+      ),
+    ).thenAnswer((_) async => reminder());
+    when(
+      () => reminders.delete(
+        orgId: any(named: 'orgId'),
+        reminderId: any(named: 'reminderId'),
+      ),
+    ).thenAnswer((_) async {});
   });
 
-  ProviderContainer containerWith(List<SavedMessage> items, {String org = 'org-1'}) {
+  ProviderContainer containerWith({
+    List<SavedMessage> items = const [],
+    List<MessageReminder> pending = const [],
+    String org = 'org-1',
+  }) {
     when(
-      () => repository.list(orgId: any(named: 'orgId')),
+      () => saved.list(orgId: any(named: 'orgId')),
     ).thenAnswer((_) async => items);
+    when(
+      () => reminders.list(orgId: any(named: 'orgId')),
+    ).thenAnswer((_) async => pending);
 
     final container = ProviderContainer(
       overrides: [
-        savedRepositoryProvider.overrideWithValue(repository),
+        savedRepositoryProvider.overrideWithValue(saved),
+        reminderRepositoryProvider.overrideWithValue(reminders),
         currentOrgIdProvider.overrideWithValue(org),
       ],
     );
@@ -75,45 +101,46 @@ void main() {
     return container;
   }
 
-  test('loads the saved list for the selected workspace', () async {
-    final container = containerWith([item(id: 's1')]);
+  test('loads saved messages and pending reminders together', () async {
+    final container = containerWith(
+      items: [item(id: 's1')],
+      pending: [reminder()],
+    );
 
     await container.read(savedProvider.notifier).refresh();
 
-    expect(container.read(savedProvider).items, hasLength(1));
-    verify(() => repository.list(orgId: 'org-1')).called(1);
+    final state = container.read(savedProvider);
+    expect(state.items, hasLength(1));
+    // The reminder is matched to its row by channel and message.
+    expect(
+      state.reminderFor(const SavedTarget(channelId: 'c1', threadId: 't1')),
+      isNotNull,
+    );
   });
 
   test('reading it does not fetch, so a message menu costs nothing', () async {
-    final container = containerWith([item(id: 's1')]);
+    final container = containerWith(items: [item(id: 's1')]);
 
-    // Simply observing the state, as every message menu does.
     expect(container.read(savedProvider).items, isEmpty);
     expect(container.read(savedKeysProvider), isEmpty);
-    verifyNever(() => repository.list(orgId: any(named: 'orgId')));
+    verifyNever(() => saved.list(orgId: any(named: 'orgId')));
+    verifyNever(() => reminders.list(orgId: any(named: 'orgId')));
   });
 
   test('with no workspace selected it asks the server for nothing', () async {
-    final container = containerWith([item(id: 's1')], org: '');
+    final container = containerWith(items: [item(id: 's1')], org: '');
 
     await container.read(savedProvider.notifier).refresh();
 
     expect(container.read(savedProvider).items, isEmpty);
-    verifyNever(() => repository.list(orgId: any(named: 'orgId')));
+    verifyNever(() => saved.list(orgId: any(named: 'orgId')));
   });
 
   test('a failed load is reported, not shown as an empty list', () async {
+    final container = containerWith();
     when(
-      () => repository.list(orgId: any(named: 'orgId')),
+      () => saved.list(orgId: any(named: 'orgId')),
     ).thenThrow(Exception('offline'));
-
-    final container = ProviderContainer(
-      overrides: [
-        savedRepositoryProvider.overrideWithValue(repository),
-        currentOrgIdProvider.overrideWithValue('org-1'),
-      ],
-    );
-    addTearDown(container.dispose);
 
     await container.read(savedProvider.notifier).refresh();
 
@@ -122,12 +149,21 @@ void main() {
     expect(state.items, isEmpty);
   });
 
-  test('overdue rows come first, then the most recently saved', () {
-    final sorted = SavedNotifier.sortForDisplay([
-      item(id: 'old', savedAt: DateTime.utc(2026, 11, 1)),
-      item(id: 'due', savedAt: DateTime.utc(2026, 10, 1), overdue: true),
-      item(id: 'new', savedAt: DateTime.utc(2026, 11, 5)),
-    ]);
+  test('rows whose reminder has passed come first, then newest saved', () {
+    final due = item(id: 'due', threadId: 'due', savedAt: DateTime.utc(2026, 10));
+    final recent = item(id: 'new', threadId: 'new', savedAt: DateTime.utc(2026, 11, 5));
+    final old = item(id: 'old', threadId: 'old', savedAt: DateTime.utc(2026, 11));
+
+    final sorted = SavedNotifier.sortForDisplay(
+      [old, due, recent],
+      {
+        'c1:due': reminder(
+          threadId: 'due',
+          remindAt: DateTime(2026, 11, 6, 9),
+        ),
+      },
+      now: DateTime(2026, 11, 6, 10),
+    );
 
     expect(sorted.map((e) => e.id), ['due', 'new', 'old']);
   });
@@ -135,53 +171,118 @@ void main() {
   test(
     'setting a reminder on an unsaved message saves it first, then reminds',
     () async {
-      final container = containerWith([]);
+      final container = containerWith();
       await container.read(savedProvider.notifier).refresh();
 
       const target = SavedTarget(channelId: 'c9', threadId: 't9');
       await container
           .read(savedProvider.notifier)
-          .setReminder(target: target, remindAt: DateTime.utc(2026, 11, 6, 15));
+          .setReminder(target: target, preset: ReminderPreset.inOneHour);
 
-      // On the server a reminder belongs to a saved message, so the order is
-      // part of the contract, not an implementation detail.
+      // The ticket asks for the message to be saved so the reminder has a row
+      // in the Saved list; the reminder itself is a separate resource.
       verifyInOrder([
-        () => repository.save(orgId: 'org-1', target: target),
-        () => repository.setReminder(
+        () => saved.save(orgId: 'org-1', target: target),
+        () => reminders.create(
           orgId: 'org-1',
           target: target,
-          remindAt: DateTime.utc(2026, 11, 6, 15),
+          preset: ReminderPreset.inOneHour,
+          tzOffsetMinutes: any(named: 'tzOffsetMinutes'),
         ),
       ]);
     },
   );
 
   test('a message already saved is not saved a second time', () async {
-    const target = SavedTarget(channelId: 'c1', threadId: 't1');
-    final container = containerWith([item(id: 's1')]);
+    final container = containerWith(items: [item(id: 's1')]);
     await container.read(savedProvider.notifier).refresh();
 
-    await container
-        .read(savedProvider.notifier)
-        .setReminder(target: target, remindAt: DateTime.utc(2026, 11, 6, 15));
+    await container.read(savedProvider.notifier).setReminder(
+      target: const SavedTarget(channelId: 'c1', threadId: 't1'),
+      preset: ReminderPreset.inThirtyMinutes,
+    );
 
     verifyNever(
-      () => repository.save(
-        orgId: any(named: 'orgId'),
-        target: any(named: 'target'),
-      ),
+      () => saved.save(orgId: any(named: 'orgId'), target: any(named: 'target')),
     );
     verify(
-      () => repository.setReminder(
+      () => reminders.create(
         orgId: 'org-1',
-        target: target,
-        remindAt: DateTime.utc(2026, 11, 6, 15),
+        target: any(named: 'target'),
+        preset: ReminderPreset.inThirtyMinutes,
+        tzOffsetMinutes: any(named: 'tzOffsetMinutes'),
       ),
     ).called(1);
   });
 
+  test('changing the time replaces the reminder rather than adding one', () async {
+    final container = containerWith(
+      items: [item(id: 's1')],
+      pending: [reminder(id: 'rem-old')],
+    );
+    await container.read(savedProvider.notifier).refresh();
+
+    await container.read(savedProvider.notifier).setReminder(
+      target: const SavedTarget(channelId: 'c1', threadId: 't1'),
+      preset: ReminderPreset.tomorrowMorning,
+    );
+
+    // Otherwise the message would be reminded about twice.
+    verifyInOrder([
+      () => reminders.delete(orgId: 'org-1', reminderId: 'rem-old'),
+      () => reminders.create(
+        orgId: 'org-1',
+        target: any(named: 'target'),
+        preset: ReminderPreset.tomorrowMorning,
+        tzOffsetMinutes: any(named: 'tzOffsetMinutes'),
+      ),
+    ]);
+  });
+
+  test('the client sends its own UTC offset, which the server needs', () async {
+    final container = containerWith();
+    await container.read(savedProvider.notifier).refresh();
+
+    await container.read(savedProvider.notifier).setReminder(
+      target: const SavedTarget(channelId: 'c9', threadId: 't9'),
+      preset: ReminderPreset.tomorrowMorning,
+    );
+
+    final offset =
+        verify(
+              () => reminders.create(
+                orgId: any(named: 'orgId'),
+                target: any(named: 'target'),
+                preset: any(named: 'preset'),
+                tzOffsetMinutes: captureAny(named: 'tzOffsetMinutes'),
+              ),
+            ).captured.single
+            as int;
+    expect(offset, DateTime.now().timeZoneOffset.inMinutes);
+  });
+
+  test('cancelling a reminder leaves the message saved', () async {
+    final container = containerWith(
+      items: [item(id: 's1')],
+      pending: [reminder(id: 'rem-9')],
+    );
+    await container.read(savedProvider.notifier).refresh();
+
+    await container
+        .read(savedProvider.notifier)
+        .clearReminder(const SavedTarget(channelId: 'c1', threadId: 't1'));
+
+    verify(() => reminders.delete(orgId: 'org-1', reminderId: 'rem-9')).called(1);
+    verifyNever(
+      () => saved.remove(
+        orgId: any(named: 'orgId'),
+        savedMessageId: any(named: 'savedMessageId'),
+      ),
+    );
+  });
+
   test('removing a message deletes by the saved id, not the thread id', () async {
-    final container = containerWith([item(id: 'saved-55', threadId: 't1')]);
+    final container = containerWith(items: [item(id: 'saved-55')]);
     await container.read(savedProvider.notifier).refresh();
 
     await container
@@ -189,12 +290,12 @@ void main() {
         .removeTarget(const SavedTarget(channelId: 'c1', threadId: 't1'));
 
     verify(
-      () => repository.remove(orgId: 'org-1', savedMessageId: 'saved-55'),
+      () => saved.remove(orgId: 'org-1', savedMessageId: 'saved-55'),
     ).called(1);
   });
 
   test('removing a message the list does not know does nothing', () async {
-    final container = containerWith([item(id: 'saved-55')]);
+    final container = containerWith(items: [item(id: 'saved-55')]);
     await container.read(savedProvider.notifier).refresh();
 
     await container
@@ -202,7 +303,7 @@ void main() {
         .removeTarget(const SavedTarget(channelId: 'zz', threadId: 'zz'));
 
     verifyNever(
-      () => repository.remove(
+      () => saved.remove(
         orgId: any(named: 'orgId'),
         savedMessageId: any(named: 'savedMessageId'),
       ),
@@ -210,30 +311,29 @@ void main() {
   });
 
   test('a failed reminder reaches the caller instead of looking set', () async {
-    final container = containerWith([]);
+    final container = containerWith();
     await container.read(savedProvider.notifier).refresh();
 
     when(
-      () => repository.setReminder(
+      () => reminders.create(
         orgId: any(named: 'orgId'),
         target: any(named: 'target'),
-        remindAt: any(named: 'remindAt'),
+        preset: any(named: 'preset'),
+        tzOffsetMinutes: any(named: 'tzOffsetMinutes'),
       ),
     ).thenThrow(Exception('rejected'));
 
     await expectLater(
       container.read(savedProvider.notifier).setReminder(
         target: const SavedTarget(channelId: 'c9', threadId: 't9'),
-        remindAt: DateTime.utc(2026, 11, 6, 15),
+        preset: ReminderPreset.inOneHour,
       ),
       throwsException,
     );
   });
 
   test('savedKeys reports which messages are saved', () async {
-    final container = containerWith([
-      item(id: 's1', channelId: 'c1', threadId: 't1'),
-    ]);
+    final container = containerWith(items: [item(id: 's1')]);
     await container.read(savedProvider.notifier).refresh();
 
     final keys = container.read(savedKeysProvider);
