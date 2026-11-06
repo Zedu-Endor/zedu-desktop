@@ -19,7 +19,6 @@ void main() {
         Scaffold(
           body: OrganizationSection(
             organization: org,
-            isSaving: false,
             onSave: (_) {},
             onDelete: () async {},
             onLeave: () async {},

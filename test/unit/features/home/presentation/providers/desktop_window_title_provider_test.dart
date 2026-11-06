@@ -185,7 +185,6 @@ void main() {
                   id: 'ws-1',
                   name: 'Zedu Workspace',
                   avatar: '',
-                  channelsCount: 5,
                 ),
               ),
             ),
