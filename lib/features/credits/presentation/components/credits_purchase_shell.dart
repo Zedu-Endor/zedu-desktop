@@ -12,7 +12,7 @@ class CreditsPurchaseShell extends ConsumerWidget {
     final userName = authState.user?.fullname ?? 'Zedu User';
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
