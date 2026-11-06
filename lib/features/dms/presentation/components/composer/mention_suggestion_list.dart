@@ -56,60 +56,67 @@ class MentionSuggestionList extends StatelessWidget {
               itemBuilder: (context, index) {
                 final p = suggestions[index];
                 final initial = avatarInitial(p.username);
-                return InkWell(
+                // One announced, actionable item per person (Ziki #590).
+                return Semantics(
+                  button: true,
+                  label: 'Mention @${p.username}',
+                  excludeSemantics: true,
                   onTap: () => onSelect(p),
-                  hoverColor: colors.primary.withValues(alpha: 0.07),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: const Color(0xFF6458F5),
-                          foregroundImage:
-                              p.avatarUrl != null && p.avatarUrl!.isNotEmpty
-                              ? NetworkImage(p.avatarUrl!)
-                              : null,
-                          onForegroundImageError:
-                              p.avatarUrl != null && p.avatarUrl!.isNotEmpty
-                              ? ignoreAvatarError
-                              : null,
-                          child: Text(
-                            initial,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                  child: InkWell(
+                    onTap: () => onSelect(p),
+                    hoverColor: colors.primary.withValues(alpha: 0.07),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: const Color(0xFF6458F5),
+                            foregroundImage:
+                                p.avatarUrl != null && p.avatarUrl!.isNotEmpty
+                                ? NetworkImage(p.avatarUrl!)
+                                : null,
+                            onForegroundImageError:
+                                p.avatarUrl != null && p.avatarUrl!.isNotEmpty
+                                ? ignoreAvatarError
+                                : null,
+                            child: Text(
+                              initial,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              p.username,
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                            if (p.email.isNotEmpty)
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               Text(
-                                p.email,
+                                p.username,
                                 style: TextStyle(
-                                  color: colors.textHint,
-                                  fontSize: 11,
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
                                 ),
                               ),
-                          ],
-                        ),
-                      ],
+                              if (p.email.isNotEmpty)
+                                Text(
+                                  p.email,
+                                  style: TextStyle(
+                                    color: colors.textHint,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
