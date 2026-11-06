@@ -42,8 +42,9 @@ void main() {
     ) async {
       {
         final reads = [history('original'), history('corrected')];
-        when(() => repository.getMessages(any(), page: any(named: 'page')))
-            .thenAnswer((_) async => reads.removeAt(0));
+        when(
+          () => repository.getMessages(any(), page: any(named: 'page')),
+        ).thenAnswer((_) async => reads.removeAt(0));
         final container = ProviderContainer(
           overrides: [
             authNotifierProvider.overrideWith(_SignedOutAuth.new),
@@ -115,8 +116,9 @@ void main() {
       tester,
     ) async {
       {
-        when(() => repository.getMessages(any(), page: any(named: 'page')))
-            .thenAnswer((_) async => history('same'));
+        when(
+          () => repository.getMessages(any(), page: any(named: 'page')),
+        ).thenAnswer((_) async => history('same'));
         final container = ProviderContainer(
           overrides: [
             authNotifierProvider.overrideWith(_SignedOutAuth.new),
@@ -148,8 +150,9 @@ void main() {
               ...history('corrected'),
             ],
           ];
-          when(() => repository.getMessages(any(), page: any(named: 'page')))
-              .thenAnswer((_) async => reads.removeAt(0));
+          when(
+            () => repository.getMessages(any(), page: any(named: 'page')),
+          ).thenAnswer((_) async => reads.removeAt(0));
           final container = ProviderContainer(
             overrides: [
               authNotifierProvider.overrideWith(_SignedOutAuth.new),
@@ -174,8 +177,9 @@ void main() {
     ) async {
       {
         final reads = [history('original'), history('original')];
-        when(() => repository.getMessages(any(), page: any(named: 'page')))
-            .thenAnswer((_) async => reads.removeAt(0));
+        when(
+          () => repository.getMessages(any(), page: any(named: 'page')),
+        ).thenAnswer((_) async => reads.removeAt(0));
         final saving = Completer<void>();
         when(
           () => repository.editMessage(
@@ -224,10 +228,11 @@ void main() {
 
     setUp(() async {
       mockRepository = MockDmRepository();
-      when(() => mockRepository.getMessages(any(), page: any(named: 'page')))
-          .thenAnswer(
-            (_) async => List<Map<String, dynamic>>.from(initialMessages),
-          );
+      when(
+        () => mockRepository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer(
+        (_) async => List<Map<String, dynamic>>.from(initialMessages),
+      );
 
       container = ProviderContainer(
         overrides: [dmRepositoryProvider.overrideWithValue(mockRepository)],
@@ -469,13 +474,14 @@ void _deleteTests() {
 
     setUp(() async {
       mockRepository = MockDmRepository();
-      when(() => mockRepository.getMessages(any(), page: any(named: 'page')))
-          .thenAnswer(
-            (_) async => [
-              {'id': 'm1', 'content': 'hello', 'user_id': 'u1'},
-              {'id': 'm2', 'content': 'again', 'user_id': 'u1'},
-            ],
-          );
+      when(
+        () => mockRepository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer(
+        (_) async => [
+          {'id': 'm1', 'content': 'hello', 'user_id': 'u1'},
+          {'id': 'm2', 'content': 'again', 'user_id': 'u1'},
+        ],
+      );
       container = ProviderContainer(
         overrides: [dmRepositoryProvider.overrideWithValue(mockRepository)],
       );
@@ -553,11 +559,12 @@ void _loadErrorTests() {
 
     test('flags a failed first load and clears it on retry', () async {
       var fail = true;
-      when(() => mockRepository.getMessages(any(), page: any(named: 'page')))
-          .thenAnswer((_) async {
-            if (fail) throw Exception('network error');
-            return page(2, 'm');
-          });
+      when(
+        () => mockRepository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer((_) async {
+        if (fail) throw Exception('network error');
+        return page(2, 'm');
+      });
 
       final notifier = container
           .listen(chatHistoryProvider('ch-1'), (_, _) {})
@@ -576,8 +583,9 @@ void _loadErrorTests() {
     });
 
     test('a successful first load reports no error', () async {
-      when(() => mockRepository.getMessages(any(), page: any(named: 'page')))
-          .thenAnswer((_) async => page(2, 'm'));
+      when(
+        () => mockRepository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer((_) async => page(2, 'm'));
 
       final notifier = container
           .listen(chatHistoryProvider('ch-1'), (_, _) {})
@@ -590,13 +598,15 @@ void _loadErrorTests() {
 
     test('a failed loadMore keeps hasMore and can be retried', () async {
       var failNextPage = true;
-      when(() => mockRepository.getMessages(any(), page: 1))
-          .thenAnswer((_) async => page(DmRepository.pageSize, 'a'));
-      when(() => mockRepository.getMessages(any(), page: 2))
-          .thenAnswer((_) async {
-            if (failNextPage) throw Exception('network error');
-            return page(1, 'b');
-          });
+      when(
+        () => mockRepository.getMessages(any(), page: 1),
+      ).thenAnswer((_) async => page(DmRepository.pageSize, 'a'));
+      when(() => mockRepository.getMessages(any(), page: 2)).thenAnswer((
+        _,
+      ) async {
+        if (failNextPage) throw Exception('network error');
+        return page(1, 'b');
+      });
 
       final notifier = container
           .listen(chatHistoryProvider('ch-1'), (_, _) {})
@@ -754,8 +764,9 @@ void _retryTests() {
 
     setUp(() async {
       mockRepository = MockDmRepository();
-      when(() => mockRepository.getMessages(any(), page: any(named: 'page')))
-          .thenAnswer((_) async => []);
+      when(
+        () => mockRepository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer((_) async => []);
 
       container = ProviderContainer(
         overrides: [
@@ -791,72 +802,78 @@ void _retryTests() {
       },
     );
 
-    test('retryMessage reads is_channel directly from failed message payload even when sendOptions are absent', () async {
-      when(
-        () => mockRepository.sendMessage(
-          any(),
-          any(),
-          media: any(named: 'media'),
-          mentions: any(named: 'mentions'),
-          isChannel: any(named: 'isChannel'),
-        ),
-      ).thenAnswer((_) async => 'thread-retry');
+    test(
+      'retryMessage reads is_channel directly from failed message payload even when sendOptions are absent',
+      () async {
+        when(
+          () => mockRepository.sendMessage(
+            any(),
+            any(),
+            media: any(named: 'media'),
+            mentions: any(named: 'mentions'),
+            isChannel: any(named: 'isChannel'),
+          ),
+        ).thenAnswer((_) async => 'thread-retry');
 
-      notifier.messages = [
-        {
-          'id': 'failed-msg-1',
-          'content': 'Retrying channel message',
-          'channel_id': 'channel-xyz',
-          'status': 'failed',
-          'is_channel': true,
-        },
-      ];
+        notifier.messages = [
+          {
+            'id': 'failed-msg-1',
+            'content': 'Retrying channel message',
+            'channel_id': 'channel-xyz',
+            'status': 'failed',
+            'is_channel': true,
+          },
+        ];
 
-      await notifier.retryMessage('failed-msg-1');
+        await notifier.retryMessage('failed-msg-1');
 
-      verify(
-        () => mockRepository.sendMessage(
-          'channel-xyz',
-          'Retrying channel message',
-          media: null,
-          isChannel: true,
-        ),
-      ).called(1);
-      expect(notifier.messages.first['status'], isNull);
-      expect(notifier.messages.first['thread_id'], 'thread-retry');
-    });
+        verify(
+          () => mockRepository.sendMessage(
+            'channel-xyz',
+            'Retrying channel message',
+            media: null,
+            isChannel: true,
+          ),
+        ).called(1);
+        expect(notifier.messages.first['status'], isNull);
+        expect(notifier.messages.first['thread_id'], 'thread-retry');
+      },
+    );
 
-    test('retryMessage falls back to isChannel: false when message is a DM and has no is_channel flag', () async {
-      when(
-        () => mockRepository.sendMessage(
-          any(),
-          any(),
-          media: any(named: 'media'),
-          mentions: any(named: 'mentions'),
-          isChannel: any(named: 'isChannel'),
-        ),
-      ).thenAnswer((_) async => 'thread-dm');
+    test(
+      'retryMessage falls back to isChannel: false when message is a DM and has no is_channel flag',
+      () async {
+        when(
+          () => mockRepository.sendMessage(
+            any(),
+            any(),
+            media: any(named: 'media'),
+            mentions: any(named: 'mentions'),
+            isChannel: any(named: 'isChannel'),
+          ),
+        ).thenAnswer((_) async => 'thread-dm');
 
-      notifier.messages = [
-        {
-          'id': 'failed-dm-1',
-          'content': 'Retrying DM message',
-          'channel_id': 'channel-xyz',
-          'status': 'failed',
-        },
-      ];
+        notifier.messages = [
+          {
+            'id': 'failed-dm-1',
+            'content': 'Retrying DM message',
+            'channel_id': 'channel-xyz',
+            'status': 'failed',
+          },
+        ];
 
-      await notifier.retryMessage('failed-dm-1');
+        await notifier.retryMessage('failed-dm-1');
 
-      verify(
-        () => mockRepository.sendMessage(
-          'channel-xyz',
-          'Retrying DM message',
-          media: null,
-          isChannel: false,
-        ),
-      ).called(1);
-    });
+        verify(
+          () => mockRepository.sendMessage(
+            'channel-xyz',
+            'Retrying DM message',
+            media: null,
+            isChannel: false,
+          ),
+        ).called(1);
+      },
+    );
 
     test('auto-disposes ChatHistoryNotifier when listener closes', () async {
       final sub = container.listen(chatHistoryProvider('ch-auto'), (_, _) {});
@@ -947,8 +964,9 @@ void _clearHistoryTests() {
       mockRepository = MockDmRepository();
       storage = _MemoryStorage();
       serverMessages = [newest, older];
-      when(() => mockRepository.getMessages(any(), page: any(named: 'page')))
-          .thenAnswer((_) async => List.of(serverMessages));
+      when(
+        () => mockRepository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer((_) async => List.of(serverMessages));
     });
 
     // Each container is a fresh app session sharing the same device storage.

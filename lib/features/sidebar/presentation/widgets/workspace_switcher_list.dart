@@ -280,7 +280,10 @@ class _WorkspaceListItem extends StatelessWidget {
                     top: -6,
                     right: -6,
                     child: Container(
-                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 5,

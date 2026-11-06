@@ -497,8 +497,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     if (HardwareKeyboard.instance.isMetaPressed) modifiers.add('meta');
 
     if (modifiers.isNotEmpty &&
-        ref.read(shortcutManagerProvider.notifier).shouldPassToSystem(key,
-            modifiers)) {
+        ref
+            .read(shortcutManagerProvider.notifier)
+            .shouldPassToSystem(key, modifiers)) {
       return KeyEventResult.ignored;
     }
 

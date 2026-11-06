@@ -35,7 +35,13 @@ TextSpan buildInlineMarkdownSpan(
   TextStyle style, {
   bool keepMarkers = false,
   TextSpan Function(String text, TextStyle style)? plainText,
-  TextSpan Function(String label, String url, TextStyle style, List<InlineSpan> children)? link,
+  TextSpan Function(
+    String label,
+    String url,
+    TextStyle style,
+    List<InlineSpan> children,
+  )?
+  link,
 }) {
   if (text.isEmpty) return TextSpan(style: style, text: '');
   return TextSpan(
@@ -55,7 +61,13 @@ List<InlineSpan> _inlineSpans(
   TextStyle style,
   bool keepMarkers,
   TextSpan Function(String text, TextStyle style) plainText,
-  TextSpan Function(String label, String url, TextStyle style, List<InlineSpan> children)? link,
+  TextSpan Function(
+    String label,
+    String url,
+    TextStyle style,
+    List<InlineSpan> children,
+  )?
+  link,
 ) {
   final spans = <InlineSpan>[];
   final hiddenStyle = style.copyWith(color: Colors.transparent, fontSize: 0.01);

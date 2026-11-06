@@ -226,7 +226,10 @@ class FoldersTable extends StatelessWidget {
                 tooltip: 'Delete folder',
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
                 icon: Icon(Icons.delete_outline, size: 18, color: colors.error),
                 onPressed: () => onDelete!(folder),
               ),

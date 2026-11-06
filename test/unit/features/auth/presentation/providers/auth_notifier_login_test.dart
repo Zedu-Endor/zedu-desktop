@@ -69,32 +69,36 @@ void main() {
       expect(error, isNot(contains('Invalid email and password supplied')));
     });
 
-    test('401 on the login route shows the generic message, not session expiry',
-        () async {
-      final error = await errorOnRejectedLogin(
-        const ApiFailure(
-          message: 'Unauthorized',
-          statusCode: 401,
-          kind: ApiFailureKind.unauthorized,
-        ),
-      );
-      expect(error, AuthNotifier.invalidCredentialsMessage);
-      expect(error, isNot(AuthNotifier.sessionExpiredMessage));
-    });
+    test(
+      '401 on the login route shows the generic message, not session expiry',
+      () async {
+        final error = await errorOnRejectedLogin(
+          const ApiFailure(
+            message: 'Unauthorized',
+            statusCode: 401,
+            kind: ApiFailureKind.unauthorized,
+          ),
+        );
+        expect(error, AuthNotifier.invalidCredentialsMessage);
+        expect(error, isNot(AuthNotifier.sessionExpiredMessage));
+      },
+    );
 
-    test('an identically-rephrased rejection also shows the generic message',
-        () async {
-      // The backend may phrase the same rejection differently; the mapping
-      // must not depend on one exact sentence.
-      final error = await errorOnRejectedLogin(
-        const ApiFailure(
-          message: 'Incorrect password supplied',
-          statusCode: 400,
-          kind: ApiFailureKind.client,
-        ),
-      );
-      expect(error, AuthNotifier.invalidCredentialsMessage);
-    });
+    test(
+      'an identically-rephrased rejection also shows the generic message',
+      () async {
+        // The backend may phrase the same rejection differently; the mapping
+        // must not depend on one exact sentence.
+        final error = await errorOnRejectedLogin(
+          const ApiFailure(
+            message: 'Incorrect password supplied',
+            statusCode: 400,
+            kind: ApiFailureKind.client,
+          ),
+        );
+        expect(error, AuthNotifier.invalidCredentialsMessage);
+      },
+    );
 
     test('a rate-limited login keeps saying what actually happened', () async {
       const tooMany = 'Too many attempts, try again later';
@@ -116,7 +120,10 @@ void main() {
           kind: ApiFailureKind.network,
         ),
       );
-      expect(error, 'No internet connection. Check your network and try again.');
+      expect(
+        error,
+        'No internet connection. Check your network and try again.',
+      );
       expect(error, isNot(AuthNotifier.invalidCredentialsMessage));
     });
   });

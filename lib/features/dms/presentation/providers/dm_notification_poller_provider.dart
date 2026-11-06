@@ -52,12 +52,10 @@ class DmNotificationPollerNotifier extends Notifier<void> {
 
   void _startPoller(String channelId) {
     _seenIds.putIfAbsent(channelId, () => <String>{});
-    _pollingTimers[channelId] = Stream<int>.periodic(
-      const Duration(seconds: 10),
-      (i) => i,
-    ).listen((_) {
-      unawaited(_checkForNewMessages(channelId));
-    });
+    _pollingTimers[channelId] =
+        Stream<int>.periodic(const Duration(seconds: 10), (i) => i).listen((_) {
+          unawaited(_checkForNewMessages(channelId));
+        });
   }
 
   void _stopPoller(String channelId) {
@@ -85,13 +83,11 @@ class DmNotificationPollerNotifier extends Notifier<void> {
         final senderId = (msg['user_id'] ?? msg['userId']).toString();
         if (senderId == currentUserId || senderId == 'me') continue;
 
-        final senderName =
-            (msg['sender_name'] ?? msg['username'] ?? 'Someone').toString();
-        ref.read(notificationServiceProvider).handleIncomingMessage(
-          msg,
-          channelId,
-          senderName,
-        );
+        final senderName = (msg['sender_name'] ?? msg['username'] ?? 'Someone')
+            .toString();
+        ref
+            .read(notificationServiceProvider)
+            .handleIncomingMessage(msg, channelId, senderName);
       }
 
       _seenIds[channelId] = seen;
@@ -103,5 +99,5 @@ class DmNotificationPollerNotifier extends Notifier<void> {
 
 final dmNotificationPollerProvider =
     NotifierProvider<DmNotificationPollerNotifier, void>(
-  DmNotificationPollerNotifier.new,
-);
+      DmNotificationPollerNotifier.new,
+    );

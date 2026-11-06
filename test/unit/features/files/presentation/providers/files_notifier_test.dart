@@ -263,8 +263,10 @@ class _PagedRepository implements FilesRepository {
   }) async => const Success(FoldersPage(folders: []));
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId}) async =>
-      Success(WorkspaceFile(id: file.name, name: file.name));
+  Future<Result<WorkspaceFile>> uploadFile(
+    XFile file, {
+    String? parentId,
+  }) async => Success(WorkspaceFile(id: file.name, name: file.name));
 
   @override
   Future<Result<void>> createFolder({
@@ -279,7 +281,10 @@ class _UploadRepository implements FilesRepository {
   ApiFailure? folderError;
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId}) async {
+  Future<Result<WorkspaceFile>> uploadFile(
+    XFile file, {
+    String? parentId,
+  }) async {
     uploaded.add(file.name);
     return file.name.startsWith('bad')
         ? const Failure(ApiFailure(message: 'too large'))

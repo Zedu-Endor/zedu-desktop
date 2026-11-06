@@ -22,7 +22,9 @@ void main() {
       expect(decoration.color, const Color(0xFFECFDF5));
     });
 
-    testWidgets('renders pending status with neutral amber styling', (tester) async {
+    testWidgets('renders pending status with neutral amber styling', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildTestMaterialApp(const ProfileStatusPill(status: 'pending')),
       );

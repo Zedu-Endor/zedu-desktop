@@ -24,13 +24,9 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            networkStatusProvider.overrideWith(() => fakeNotifier),
-          ],
+          overrides: [networkStatusProvider.overrideWith(() => fakeNotifier)],
           child: buildTestMaterialApp(
-            const Scaffold(
-              body: OfflineStatusIndicator(),
-            ),
+            const Scaffold(body: OfflineStatusIndicator()),
           ),
         ),
       );
@@ -48,13 +44,9 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            networkStatusProvider.overrideWith(() => fakeNotifier),
-          ],
+          overrides: [networkStatusProvider.overrideWith(() => fakeNotifier)],
           child: buildTestMaterialApp(
-            const Scaffold(
-              body: OfflineStatusIndicator(),
-            ),
+            const Scaffold(body: OfflineStatusIndicator()),
           ),
         ),
       );
@@ -77,13 +69,9 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            networkStatusProvider.overrideWith(() => fakeNotifier),
-          ],
+          overrides: [networkStatusProvider.overrideWith(() => fakeNotifier)],
           child: buildTestMaterialApp(
-            const Scaffold(
-              body: OfflineStatusIndicator(),
-            ),
+            const Scaffold(body: OfflineStatusIndicator()),
           ),
         ),
       );
@@ -102,13 +90,9 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            networkStatusProvider.overrideWith(() => fakeNotifier),
-          ],
+          overrides: [networkStatusProvider.overrideWith(() => fakeNotifier)],
           child: buildTestMaterialApp(
-            const Scaffold(
-              body: OfflineStatusIndicator(),
-            ),
+            const Scaffold(body: OfflineStatusIndicator()),
           ),
         ),
       );

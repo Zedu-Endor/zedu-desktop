@@ -61,6 +61,4 @@ class ShortcutManager extends Notifier<Map<String, bool>> {
 }
 
 final shortcutManagerProvider =
-    NotifierProvider<ShortcutManager, Map<String, bool>>(
-  ShortcutManager.new,
-);
+    NotifierProvider<ShortcutManager, Map<String, bool>>(ShortcutManager.new);
