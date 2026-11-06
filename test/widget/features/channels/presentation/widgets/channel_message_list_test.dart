@@ -264,4 +264,68 @@ void main() {
       );
     });
   });
+
+  group('search in the channel (Ziki #2849)', () {
+    const messages = Success([
+      ChannelMessage(senderName: 'gold', text: 'Deploy is done'),
+      ChannelMessage(senderName: 'Ada', text: 'lunch at noon?'),
+      ChannelMessage(senderName: 'Grace', text: 'Who owns the deploy script'),
+    ]);
+    final search = find.byKey(const ValueKey('channel-message-search'));
+
+    testWidgets('shows a search box above the messages', (tester) async {
+      await pumpList(tester, messages);
+
+      expect(search, findsOneWidget);
+      expect(find.text('Search messages in this channel'), findsOneWidget);
+    });
+
+    testWidgets('typing keeps only the matching messages', (tester) async {
+      await pumpList(tester, messages);
+
+      await tester.enterText(search, 'DEPLOY');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deploy is done'), findsOneWidget);
+      expect(find.text('Who owns the deploy script'), findsOneWidget);
+      expect(find.text('lunch at noon?'), findsNothing);
+    });
+
+    testWidgets('matches the sender name too', (tester) async {
+      await pumpList(tester, messages);
+
+      await tester.enterText(search, 'ada');
+      await tester.pumpAndSettle();
+
+      expect(find.text('lunch at noon?'), findsOneWidget);
+      expect(find.text('Deploy is done'), findsNothing);
+    });
+
+    testWidgets('says so when nothing matches', (tester) async {
+      await pumpList(tester, messages);
+
+      await tester.enterText(search, 'zzz');
+      await tester.pumpAndSettle();
+
+      expect(find.text('No messages match "zzz"'), findsOneWidget);
+      expect(find.text('Deploy is done'), findsNothing);
+    });
+
+    testWidgets('clearing the search brings every message back', (
+      tester,
+    ) async {
+      await pumpList(tester, messages);
+      await tester.enterText(search, 'lunch');
+      await tester.pumpAndSettle();
+      expect(find.text('Deploy is done'), findsNothing);
+
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deploy is done'), findsOneWidget);
+      expect(find.text('lunch at noon?'), findsOneWidget);
+      expect(find.text('Who owns the deploy script'), findsOneWidget);
+      expect(find.byTooltip('Clear search'), findsNothing);
+    });
+  });
 }

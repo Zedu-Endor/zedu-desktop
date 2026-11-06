@@ -3,7 +3,7 @@ import 'package:zedu/features/features.dart';
 
 /// The messages of a channel, newest at the bottom. Shows [empty] when the
 /// channel has no messages yet.
-class ChannelMessageList extends ConsumerWidget {
+class ChannelMessageList extends ConsumerStatefulWidget {
   const ChannelMessageList({
     super.key,
     required this.channelId,
@@ -14,7 +14,80 @@ class ChannelMessageList extends ConsumerWidget {
   final Widget empty;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChannelMessageList> createState() => _ChannelMessageListState();
+}
+
+class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
+  final _search = TextEditingController();
+
+  /// What the search box filters the loaded messages by (Ziki #2849).
+  String _query = '';
+
+  String get channelId => widget.channelId;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  bool _matches(ChannelMessage message, String query) =>
+      message.text.toLowerCase().contains(query) ||
+      message.senderName.toLowerCase().contains(query);
+
+  void _clearSearch() {
+    _search.clear();
+    setState(() => _query = '');
+  }
+
+  Widget _searchBar(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: SizedBox(
+        height: 36,
+        child: TextField(
+          key: const ValueKey('channel-message-search'),
+          controller: _search,
+          onChanged: (value) => setState(() => _query = value.trim()),
+          style: TextStyle(color: colors.textPrimary, fontSize: 13),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Search messages in this channel',
+            hintStyle: TextStyle(color: colors.textHint, fontSize: 13),
+            prefixIcon: Icon(Icons.search, size: 18, color: colors.textHint),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    icon: Icon(Icons.close, size: 16, color: colors.textHint),
+                    onPressed: _clearSearch,
+                  ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: colors.divider),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: colors.divider),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The search box above [body]: the list, or what to show instead of it.
+  Widget _withSearch(BuildContext context, Widget body) => Column(
+    children: [
+      _searchBar(context),
+      Expanded(child: body),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
     final chatHistory = ref.watch(chatHistoryProvider(channelId));
     final pendingMessages = chatHistory.messages
         .where(
@@ -57,9 +130,27 @@ class ChannelMessageList extends ConsumerWidget {
               : _buildList(context, ref, pendingMessages),
           data: (serverMessages) {
             final allMessages = [...pendingMessages, ...serverMessages];
-            return allMessages.isEmpty
-                ? empty
-                : _buildList(context, ref, allMessages);
+            if (allMessages.isEmpty) return widget.empty;
+            final query = _query.toLowerCase();
+            if (query.isEmpty) {
+              return _withSearch(
+                context,
+                _buildList(context, ref, allMessages),
+              );
+            }
+            // Searching covers the messages loaded so far.
+            final found = allMessages.where((m) => _matches(m, query)).toList();
+            return _withSearch(
+              context,
+              found.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No messages match "$_query"',
+                        style: TextStyle(color: context.colors.textHint),
+                      ),
+                    )
+                  : _buildList(context, ref, found),
+            );
           },
         );
   }
