@@ -6,9 +6,11 @@ import 'package:zedu/core/core.dart';
 /// Italic is tried first and may contain `**bold**` pairs, so text that was
 /// made bold and italic (`***word***`, from either toolbar order) is read as
 /// italic around bold instead of bold around a stray `*`. A lone `**` is the
-/// empty italic the toolbar inserts with no selection.
+/// empty italic the toolbar inserts with no selection; in a sent message it
+/// stays visible as text. `\*` is an escaped, literal star.
 final _inlineMarkdown = RegExp(
-  r'(?<!\*)\*(?<italic>(?:\*\*.+?\*\*|[^*])+?)\*(?!\*)'
+  r'\\(?<escaped>\*)'
+  r'|(?<!\*)\*(?<italic>(?:\\\*|\*\*.+?\*\*|[^*])+?)(?<!\\)\*(?!\*)'
   r'|\*\*(?<bold>.*?)\*\*(?!\*)'
   r'|(?<!\*)\*\*(?!\*)'
   r'|~~(?<strike>.*?)~~'
@@ -77,11 +79,16 @@ List<InlineSpan> _inlineSpans(
       spans.add(plainText(text.substring(lastEnd, match.start), style));
     }
 
+    final escaped = match.namedGroup('escaped');
     final italic = match.namedGroup('italic');
     final bold = match.namedGroup('bold');
     final strike = match.namedGroup('strike');
     final code = match.namedGroup('code');
-    if (italic != null) {
+    if (escaped != null) {
+      // `\*` is a literal star: shown without the backslash in a sent
+      // message, kept as typed in the composer (Ziki #2879).
+      spans.add(plainText(keepMarkers ? match.group(0)! : escaped, style));
+    } else if (italic != null) {
       addToken('*', italic, style.copyWith(fontStyle: FontStyle.italic), true);
     } else if (bold != null) {
       addToken('**', bold, style.copyWith(fontWeight: FontWeight.bold), true);
@@ -106,6 +113,10 @@ List<InlineSpan> _inlineSpans(
     } else if (keepMarkers) {
       // Empty italic (`**`): nothing to show but the hidden markers.
       spans.add(TextSpan(text: match.group(0), style: hiddenStyle));
+    } else {
+      // A lone `**` in a sent message formats nothing, so it is text
+      // (`2 ** 3`, `**/*.dart`) and stays visible (Ziki #2879).
+      spans.add(plainText(match.group(0)!, style));
     }
 
     lastEnd = match.end;

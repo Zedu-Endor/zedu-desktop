@@ -177,4 +177,48 @@ void main() {
       expect(_isBold(run.$2) && _isItalic(run.$2), isTrue);
     });
   });
+
+  group('literal asterisks in sent messages (Ziki #2879)', () {
+    String sent(String text) =>
+        buildInlineMarkdownSpan(text, _base).toPlainText();
+
+    test('unmatched ** stays visible', () {
+      expect(sent('2 ** 3 = 8'), '2 ** 3 = 8');
+      expect(sent('**'), '**');
+      expect(sent('glob: **/*.dart'), 'glob: **/*.dart');
+    });
+
+    test('escaped stars show as stars', () {
+      expect(sent(r'\*not italic\*'), '*not italic*');
+      expect(sent(r'2 \* 3'), '2 * 3');
+    });
+
+    test('an escaped star inside italic stays a star', () {
+      final span = buildInlineMarkdownSpan(r'*a\*b*', _base);
+      expect(_visibleText(span), 'a*b');
+      expect(_visible(span).every((r) => _isItalic(r.$2)), isTrue);
+    });
+
+    test('code keeps its stars', () {
+      expect(sent('`**/*`'), '**/*');
+    });
+
+    test('valid formatting still formats', () {
+      final bold = buildInlineMarkdownSpan('**bold**', _base);
+      expect(_visibleText(bold), 'bold');
+      expect(_isBold(_visible(bold).single.$2), isTrue);
+      final italic = buildInlineMarkdownSpan('a *b* c', _base);
+      expect(_visibleText(italic), 'a b c');
+    });
+
+    test('the composer keeps every character as typed', () {
+      for (final text in ['2 ** 3', '**', r'\*x\*', r'*a\*b*']) {
+        expect(
+          buildInlineMarkdownSpan(text, _base, keepMarkers: true).toPlainText(),
+          text,
+          reason: text,
+        );
+      }
+    });
+  });
 }
