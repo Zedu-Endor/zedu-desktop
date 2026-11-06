@@ -1,6 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
@@ -16,11 +13,7 @@ void main() {
   group('FormattingHelpDialog', () {
     Future<void> openDialog(WidgetTester tester) async {
       await tester.pumpWidget(
-        buildTestMaterialApp(
-          const Scaffold(
-            body: FormattingHelpDialog(),
-          ),
-        ),
+        buildTestMaterialApp(const Scaffold(body: FormattingHelpDialog())),
       );
       await tester.pumpAndSettle();
     }
@@ -32,8 +25,10 @@ void main() {
 
       expect(find.text('Formatting help'), findsOneWidget);
       expect(
-        find.text('Type these markdown shortcuts directly in your message box:'),
-        findOneWidget,
+        find.text(
+          'Type these markdown shortcuts directly in your message box:',
+        ),
+        findsOneWidget,
       );
 
       // Verify all 9 style names
@@ -62,13 +57,7 @@ void main() {
     testWidgets('clicking the close button dismisses the dialog', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        buildTestMaterialApp(
-          Scaffold(
-            body: _opener(),
-          ),
-        ),
-      );
+      await tester.pumpWidget(buildTestMaterialApp(Scaffold(body: _opener())));
 
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
@@ -80,13 +69,7 @@ void main() {
     });
 
     testWidgets('pressing Escape key dismisses the dialog', (tester) async {
-      await tester.pumpWidget(
-        buildTestMaterialApp(
-          Scaffold(
-            body: _opener(),
-          ),
-        ),
-      );
+      await tester.pumpWidget(buildTestMaterialApp(Scaffold(body: _opener())));
 
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
@@ -98,13 +81,7 @@ void main() {
     });
 
     testWidgets('clicking outside the dialog dismisses it', (tester) async {
-      await tester.pumpWidget(
-        buildTestMaterialApp(
-          Scaffold(
-            body: _opener(),
-          ),
-        ),
-      );
+      await tester.pumpWidget(buildTestMaterialApp(Scaffold(body: _opener())));
 
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();

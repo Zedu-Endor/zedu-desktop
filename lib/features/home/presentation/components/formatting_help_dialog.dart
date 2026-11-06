@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:zedu/core/core.dart';
 
 class _FormattingItem {
@@ -72,11 +71,7 @@ class FormattingHelpDialog extends StatelessWidget {
       example: 'quote text',
       isQuote: true,
     ),
-    _FormattingItem(
-      style: 'Bullet list',
-      syntax: '- item',
-      example: '• item',
-    ),
+    _FormattingItem(style: 'Bullet list', syntax: '- item', example: '• item'),
     _FormattingItem(
       style: 'Numbered list',
       syntax: '1. item',
@@ -185,15 +180,18 @@ class FormattingHelpDialog extends StatelessWidget {
                               decoration: BoxDecoration(
                                 border: Border(
                                   bottom: BorderSide(
-                                    color: colors.divider.withValues(alpha: 0.5),
+                                    color: colors.divider.withValues(
+                                      alpha: 0.5,
+                                    ),
                                     width: 1,
                                   ),
                                 ),
                               ),
                               children: [
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
                                   child: Text(
                                     item.style,
                                     style: TextStyle(
@@ -205,15 +203,23 @@ class FormattingHelpDialog extends StatelessWidget {
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      vertical: 10, horizontal: 4),
+                                    vertical: 10,
+                                    horizontal: 4,
+                                  ),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 3),
+                                      horizontal: 6,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: colors.divider.withValues(alpha: 0.2),
+                                      color: colors.divider.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(4),
                                       border: Border.all(
-                                        color: colors.divider.withValues(alpha: 0.6),
+                                        color: colors.divider.withValues(
+                                          alpha: 0.6,
+                                        ),
                                       ),
                                     ),
                                     child: Text(
@@ -228,8 +234,9 @@ class FormattingHelpDialog extends StatelessWidget {
                                   ),
                                 ),
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
                                   child: _buildResultPreview(item, colors),
                                 ),
                               ],
@@ -263,10 +270,7 @@ class FormattingHelpDialog extends StatelessWidget {
   }
 
   Widget _buildResultPreview(_FormattingItem item, AppPalette colors) {
-    TextStyle style = TextStyle(
-      color: colors.textPrimary,
-      fontSize: 13,
-    );
+    TextStyle style = TextStyle(color: colors.textPrimary, fontSize: 13);
 
     if (item.isBold) {
       style = style.copyWith(fontWeight: FontWeight.bold);
@@ -284,18 +288,13 @@ class FormattingHelpDialog extends StatelessWidget {
       );
     }
     if (item.isCode) {
-      style = style.copyWith(
-        fontFamily: 'monospace',
-        fontSize: 12,
-      );
+      style = style.copyWith(fontFamily: 'monospace', fontSize: 12);
     }
 
     if (item.isQuote) {
       return Container(
         decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: colors.primary, width: 3),
-          ),
+          border: Border(left: BorderSide(color: colors.primary, width: 3)),
         ),
         padding: const EdgeInsets.only(left: 6),
         child: Text(
