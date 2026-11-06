@@ -141,7 +141,6 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                   IconButton(
                     tooltip: 'Close',
                     icon: Icon(Icons.close, color: colors.textHint, size: 20),
-                    tooltip: 'Close',
                     splashRadius: 18,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -214,7 +213,6 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                         maxLength: 100,
                         // Rebuild so the clear button and the selected suggestion follow the text.
                         onChanged: (_) => setState(() {}),
-                        onSubmitted: (_) => _save(),
                         buildCounter:
                             (
                               _, {
