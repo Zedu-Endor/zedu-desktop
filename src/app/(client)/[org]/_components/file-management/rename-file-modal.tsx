@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import React from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
@@ -33,11 +33,16 @@ const RenameFileModal: React.FC<RenameFileModalProps> = ({
     formState: { errors },
     handleSubmit,
     watch,
+    reset,
   } = useForm<RenameFileFormData>({
     defaultValues: {
       rename: oldName,
     },
   });
+
+  useEffect(() => {
+    reset({ rename: oldName });
+  }, [oldName, reset]);
 
   const handleRename = (data: RenameFileFormData) => {
     const newName = data.rename.trim();
