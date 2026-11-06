@@ -1161,8 +1161,13 @@ class _MessageBubble extends ConsumerWidget {
                   ),
                 ),
                 if (content.isNotEmpty)
-                  _OwnMessageMenu(
-                    enabled: isMe && status == null,
+                  _MessageMenu(
+                    enabled: status == null && messageId.isNotEmpty,
+                    canModify: isMe,
+                    target: SavedTarget(
+                      channelId: channelId,
+                      threadId: messageId,
+                    ),
                     onEdit: () => onEdit(messageId, content),
                     onDelete: () => _confirmDelete(context, ref, messageId),
                     child: Container(
@@ -1192,8 +1197,13 @@ class _MessageBubble extends ConsumerWidget {
                         ? _AttachmentBubbleList(media: media, isMe: isMe)
                         // No text to hang the menu on, so it goes on the
                         // attachments (Delete only: there is nothing to edit).
-                        : _OwnMessageMenu(
-                            enabled: isMe && status == null,
+                        : _MessageMenu(
+                            enabled: status == null && messageId.isNotEmpty,
+                            canModify: isMe,
+                            target: SavedTarget(
+                              channelId: channelId,
+                              threadId: messageId,
+                            ),
                             onEdit: null,
                             onDelete: () =>
                                 _confirmDelete(context, ref, messageId),
@@ -1391,30 +1401,55 @@ class _AttachmentBubbleList extends StatelessWidget {
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
 /// your own messages, with Edit and Delete. The long press is for touch input,
 /// where there is no hover or right click.
-class _OwnMessageMenu extends StatefulWidget {
-  const _OwnMessageMenu({
+class _MessageMenu extends ConsumerStatefulWidget {
+  const _MessageMenu({
     required this.enabled,
-    required this.onEdit,
+    required this.canModify,
+    required this.target,
+    this.onEdit,
     required this.onDelete,
     required this.child,
   });
 
+  /// False only for a message the server does not have yet, which cannot be
+  /// saved or reminded about.
   final bool enabled;
+
+  /// Whether Edit and Delete belong in the menu: the user's own messages.
+  final bool canModify;
+
+  /// Identifies the message for saving and reminders.
+  final SavedTarget target;
+
   final VoidCallback? onEdit;
   final VoidCallback onDelete;
   final Widget child;
 
   @override
-  State<_OwnMessageMenu> createState() => _OwnMessageMenuState();
+  ConsumerState<_MessageMenu> createState() => _MessageMenuState();
 }
 
-class _OwnMessageMenuState extends State<_OwnMessageMenu> {
+class _MessageMenuState extends ConsumerState<_MessageMenu> {
   final _menuKey = GlobalKey<PopupMenuButtonState<String>>();
   bool _hovered = false;
+
+  Future<void> _onSelected(String value) async {
+    if (value == 'edit') {
+      widget.onEdit?.call();
+      return;
+    }
+    if (value == 'delete') {
+      widget.onDelete();
+      return;
+    }
+    await handleSavedMenuAction(context, ref, value, widget.target);
+  }
 
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
+
+    final isSaved = ref.watch(savedKeysProvider).contains(widget.target.key);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1431,18 +1466,20 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
                 key: _menuKey,
                 tooltip: 'Message actions',
                 icon: const Icon(Icons.more_horiz, size: 18),
-                onSelected: (value) =>
-                    value == 'edit' ? widget.onEdit?.call() : widget.onDelete(),
+                onSelected: _onSelected,
                 itemBuilder: (_) => [
-                  if (widget.onEdit != null)
+                  if (widget.canModify && widget.onEdit != null)
                     const PopupMenuItem(
                       value: 'edit',
                       child: Text('Edit message'),
                     ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete message'),
-                  ),
+                  if (widget.canModify)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete message'),
+                    ),
+                  if (widget.canModify) const PopupMenuDivider(height: 1),
+                  ...savedMenuEntries(isSaved: isSaved),
                 ],
               ),
             ),

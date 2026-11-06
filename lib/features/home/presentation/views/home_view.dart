@@ -186,6 +186,10 @@ class _ChatAreaSwitcher extends ConsumerWidget {
       return const ChannelDirectoryView();
     }
 
+    if (activeChat.type == ActiveChatType.saved) {
+      return const SavedView();
+    }
+
     if (state == HomeSidebarType.dms) {
       if (selectedDm != null) {
         return DmChatArea(conversation: selectedDm);
@@ -219,6 +223,7 @@ class _MainSidebar extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const WorkspaceSwitcherHeader(),
+          const _SavedSidebarEntry(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
             child: Row(
@@ -720,6 +725,103 @@ class _InviteCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// The Saved entry at the top of the Home sidebar, above Channels.
+class _SavedSidebarEntry extends ConsumerStatefulWidget {
+  const _SavedSidebarEntry();
+
+  @override
+  ConsumerState<_SavedSidebarEntry> createState() => _SavedSidebarEntryState();
+}
+
+class _SavedSidebarEntryState extends ConsumerState<_SavedSidebarEntry> {
+  @override
+  void initState() {
+    super.initState();
+    // One load per workspace, from the sidebar, which is always mounted in
+    // Home and sits where the workspace is already resolved. This is what
+    // lets a message menu read whether its message is saved without every
+    // bubble asking the server itself.
+    Future.microtask(_refresh);
+  }
+
+  void _refresh() {
+    if (!mounted) return;
+    ref.read(savedProvider.notifier).refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final selected = ref.watch(activeChatProvider).type == ActiveChatType.saved;
+
+    // Saved items belong to an organisation, so a workspace switch reloads.
+    ref.listen(currentOrgIdProvider, (previous, next) {
+      if (previous != next) _refresh();
+    });
+
+    final overdue = ref
+        .watch(savedProvider)
+        .items
+        .where((SavedMessage item) => item.overdue)
+        .length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      child: Material(
+        color: selected
+            ? colors.onPrimary.withValues(alpha: 0.12)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            ref.read(activeChatProvider.notifier).selectSaved();
+            ref.read(savedProvider.notifier).refresh();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.bookmark_outline, color: colors.onPrimary, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Saved',
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (overdue > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.error,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$overdue',
+                      style: TextStyle(
+                        color: colors.onPrimary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
