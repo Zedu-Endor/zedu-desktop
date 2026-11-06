@@ -309,9 +309,9 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       return list;
     }
 
-    if (orgId == null || orgId.length < 36) {
-      orgId = '019700db-4e22-7f90-a20e-f9116291ef24';
-    }
+    // With no workspace selected there are no members to show; never fall
+    // back to another organisation's members (Ziki #1452).
+    if (orgId == null || orgId.isEmpty) return [];
 
     try {
       final response = await _apiBaseService.get<Map<String, dynamic>>(
