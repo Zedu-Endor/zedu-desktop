@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/core.dart';
@@ -11,6 +13,10 @@ class _FakeAuthNotifier extends AuthNotifier {
   final AuthState _initial;
   StatusTimeout? savedTimeout;
   bool? savedPauseNotifications;
+  int changeStatusCalls = 0;
+
+  /// When set, a save stays in flight until this completes.
+  Completer<bool>? pendingSave;
 
   @override
   AuthState build() => _initial;
@@ -22,8 +28,11 @@ class _FakeAuthNotifier extends AuthNotifier {
     required StatusTimeout timeout,
     required bool pauseNotifications,
   }) async {
+    changeStatusCalls++;
     savedTimeout = timeout;
     savedPauseNotifications = pauseNotifications;
+    final pending = pendingSave;
+    if (pending != null) return pending.future;
     return true;
   }
 }
@@ -338,6 +347,28 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(notifier.savedTimeout, isNotNull);
+    });
+
+    testWidgets('pressing Enter again while saving saves the status once', (
+      tester,
+    ) async {
+      final pendingSave = Completer<bool>();
+      final notifier = _FakeAuthNotifier()..pendingSave = pendingSave;
+      await _pumpDialog(tester, notifier: () => notifier);
+
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.textInputAction, TextInputAction.done);
+
+      await tester.enterText(find.byType(TextField), 'Deep work');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(notifier.changeStatusCalls, 1);
+
+      pendingSave.complete(true);
+      await tester.pumpAndSettle();
     });
   });
 

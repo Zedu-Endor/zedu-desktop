@@ -145,6 +145,7 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                   ),
                   IconButton(
                     icon: Icon(Icons.close, color: colors.textHint, size: 20),
+                    tooltip: 'Close',
                     splashRadius: 18,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -197,8 +198,6 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                     Expanded(
                       child: TextField(
                         controller: _textCtrl,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _save(),
                         decoration: InputDecoration(
                           hintText: "What's your status?",
                           hintStyle: context.textTheme.bodyMedium?.copyWith(
