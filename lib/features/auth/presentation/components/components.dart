@@ -3,3 +3,4 @@ export 'auth_header_row.dart';
 export 'auth_header_strip.dart';
 export 'session_expiry_listener.dart';
 export 'social_auth_button.dart';
+export 'zedu_coin_panel.dart';

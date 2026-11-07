@@ -212,6 +212,16 @@ void main() {
       expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
     });
 
+    testWidgets('shows the Zedu Coin panel before login', (tester) async {
+      await tester.pumpWidget(buildLoginViewUnderTest());
+      await tester.pump();
+
+      expect(find.byType(ZeduCoinPanel), findsOneWidget);
+      expect(find.text('Zedu Coin (ZDU)'), findsOneWidget);
+      expect(find.text('Pre-launch'), findsOneWidget);
+      expect(find.text('Prices are subject to fluctuation.'), findsOneWidget);
+    });
+
     testWidgets('shows sign in wording on the Google and Apple buttons', (
       tester,
     ) async {

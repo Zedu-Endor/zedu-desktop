@@ -99,7 +99,9 @@ class _LoginViewState extends ConsumerState<LoginView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                context.gapV(136),
+                context.gapV(48),
+                const ZeduCoinPanel(),
+                context.gapV(32),
                 Text('Login to Zedu', style: context.textTheme.headlineMedium),
                 context.gapV(8),
                 Text(
