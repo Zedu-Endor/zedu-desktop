@@ -61,32 +61,37 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
     if (_verifyingToken != null) return;
     _verifyingToken = token;
 
-    // A link that opens the app arrives while the saved session is still
-    // being restored, so wait to know whether someone is signed in.
-    final status = await _settledAuthStatus();
-    if (!mounted) return;
-
-    // Never switch accounts silently: anyone can send a link to their own
-    // account, and following it would put you in theirs.
-    if (status == AuthStatus.authenticated) {
-      final switchAccount = await _confirmSwitchAccount();
-      if (!mounted) return;
-      if (!switchAccount) {
-        AppLogger.i('Magic link ignored — kept the current account', tag: _tag);
-        // Let the same link work if it is opened again later.
-        _lastProcessedToken = null;
-        return;
-      }
-      await ref.read(authNotifierProvider.notifier).logout();
-      if (!mounted) return;
-    }
-
-    AppLogger.i('Processing magic link deep link', tag: _tag);
     try {
+      // A link that opens the app arrives while the saved session is still
+      // being restored, so wait to know whether someone is signed in.
+      final status = await _settledAuthStatus();
+      if (!mounted) return;
+
+      // Never switch accounts silently: anyone can send a link to their own
+      // account, and following it would put you in theirs.
+      if (status == AuthStatus.authenticated) {
+        final switchAccount = await _confirmSwitchAccount();
+        if (!mounted) return;
+        if (!switchAccount) {
+          AppLogger.i(
+            'Magic link ignored — kept the current account',
+            tag: _tag,
+          );
+          // Let the same link work if it is opened again later.
+          _lastProcessedToken = null;
+          return;
+        }
+        await ref.read(authNotifierProvider.notifier).logout();
+        if (!mounted) return;
+      }
+
+      AppLogger.i('Processing magic link deep link', tag: _tag);
       await ref
           .read(authNotifierProvider.notifier)
           .verifyMagicLink(token: token);
     } finally {
+      // Cleared on every exit, a declined switch included, so the guard above
+      // doesn't drop every later link.
       _verifyingToken = null;
     }
     // Only remember a token that actually succeeded, so a failed attempt (for

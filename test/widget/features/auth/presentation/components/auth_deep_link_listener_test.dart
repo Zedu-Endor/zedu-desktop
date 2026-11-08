@@ -283,6 +283,43 @@ void main() {
         expect(find.text('Home screen'), findsOneWidget);
       });
 
+      testWidgets('after Cancel, a later link still asks (Ziki #3383)', (
+        tester,
+      ) async {
+        final calls = <String>[];
+        await _pumpRoutedListener(
+          tester,
+          appLinks: mockAppLinks,
+          notifier: FakeDeepLinkAuthNotifier(
+            initialState: _signedIn,
+            authenticated: true,
+            onVerify: (token) => calls.add('verify $token'),
+            onLogout: () => calls.add('logout'),
+          ),
+        );
+
+        linkController.add(
+          Uri.parse('zedu://auth/magick-link/verify?token=t-b'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        linkController.add(
+          Uri.parse('zedu://auth/magick-link/verify?token=t-c'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining('ada@example.com'), findsOneWidget);
+
+        await tester.tap(find.text('Sign out and continue'));
+        await tester.pumpAndSettle();
+
+        expect(calls, ['logout', 'verify t-c']);
+
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpAndSettle();
+      });
+
       testWidgets('confirming signs out, then uses the link', (tester) async {
         final calls = <String>[];
         await _pumpRoutedListener(
