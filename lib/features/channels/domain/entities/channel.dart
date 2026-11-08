@@ -46,8 +46,9 @@ class Channel {
       ownerId: json['owner_id'] as String? ?? '',
       archived: json['archived'] as bool? ?? false,
       topic: json['topic'] as String?,
-      unreadCount: json['unread_count'] as int? ?? 0,
-      membersCount: json['members_count'] as int? ?? 0,
+      // JSON numbers can arrive as decimals (3.0); `as int?` throws on those.
+      unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
+      membersCount: (json['members_count'] as num?)?.toInt() ?? 0,
       hasAccess: hasAccess,
     );
   }
