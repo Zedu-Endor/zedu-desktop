@@ -83,6 +83,25 @@ void main() {
   testWidgets('copy button copies file name to clipboard and shows toast', (
     tester,
   ) async {
+    // The real clipboard never answers under flutter_test, so record what the
+    // panel writes to it instead.
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
     const file = WorkspaceFile(
       id: 'copy-test',
       name: 'quarterly_results.xlsx',
@@ -98,9 +117,13 @@ void main() {
     await tester.tap(copyBtn);
     await tester.pumpAndSettle();
 
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    expect(data?.text, 'quarterly_results.xlsx');
+    expect(copied, ['quarterly_results.xlsx']);
     expect(find.text('File name copied'), findsOneWidget);
+
+    // The toast dismisses itself on a 4s timer; let it fire so no timer is
+    // left pending when the test ends.
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
   });
 }
 
