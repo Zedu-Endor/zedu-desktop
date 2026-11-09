@@ -35,6 +35,18 @@ List<TeamMember> createMembers(int count) {
   );
 }
 
+/// The footer renders the page number and ' of N' as two separate Text
+/// widgets, so there is never one reading '2 of 3'.
+void _expectPage(WidgetTester tester, String page, String total) {
+  expect(
+    tester
+        .widget<Text>(find.byKey(const Key('user_management_page_number')))
+        .data,
+    page,
+  );
+  expect(find.text(' of $total'), findsOneWidget);
+}
+
 void main() {
   testWidgets('offers bulk invitation alongside the existing member table', (
     tester,
@@ -347,6 +359,14 @@ void main() {
     testWidgets(
       'renders page jump input and navigates directly to requested page',
       (tester) async {
+        // 25 members push the pagination footer below the default 800x600
+        // test viewport, so the Go button cannot be tapped. The sibling
+        // tests in this file size the window for the same reason.
+        tester.view.physicalSize = const Size(1400, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
         final members = List.generate(
           25,
           (i) => TeamMember(
@@ -387,7 +407,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('3 of 3'), findsOneWidget);
+        _expectPage(tester, '3', '3');
         expect(find.text('member20@example.com'), findsOneWidget);
         expect(find.text('member0@example.com'), findsNothing);
 
@@ -396,7 +416,7 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        expect(find.text('2 of 3'), findsOneWidget);
+        _expectPage(tester, '2', '3');
         expect(find.text('member10@example.com'), findsOneWidget);
 
         // Out of bounds input clamps to valid range
@@ -406,7 +426,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('3 of 3'), findsOneWidget);
+        _expectPage(tester, '3', '3');
         expect(find.text('member20@example.com'), findsOneWidget);
       },
     );
