@@ -24,4 +24,4 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-    uses: zedu-hng/zedu-ci/.github/workflows/update-branch.yml@0fc7bfc7234bdced6e9a45d47e63610d4c965a98
+    uses: zedu-hng/zedu-ci/.github/workflows/update-branch.yml@4e68db81f7dc1ecfbb656308c1a9e9b718eaae0c

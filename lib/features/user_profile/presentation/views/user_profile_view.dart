@@ -92,6 +92,7 @@ class _ProfileContent extends StatelessWidget {
               RolesAndPermissionsSection(roles: state.rolesAndPermissions),
             UserProfileSection.billing => BillingSection(
               billing: state.billing ?? BillingInfo.empty(),
+              onInvite: notifier.inviteMember,
             ),
           },
         ),

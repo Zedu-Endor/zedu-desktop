@@ -18,5 +18,7 @@ class SecureStorageService {
       _storage.write(key: key, value: value);
   Future<String?> readData(String key) => _storage.read(key: key);
 
+  Future<void> deleteValue(String key) => _storage.delete(key: key);
+
   Future<void> clearAll() => _storage.deleteAll();
 }
