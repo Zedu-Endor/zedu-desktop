@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:zedu/core/core.dart';
-import 'package:zedu/features/features.dart';
 import 'dart:convert';
+
+import 'package:zedu/core/core.dart';
 
 class DownloadView extends ConsumerWidget {
   const DownloadView({super.key});
@@ -20,11 +19,7 @@ class DownloadView extends ConsumerWidget {
       'image': '/images/homepage/download/download-hero.png',
       'applicationCategory': 'EducationalApplication',
       'operatingSystem': 'iOS, Android',
-      'publisher': {
-        '@type': 'Organization',
-        'name': 'Zedu',
-        'url': '/',
-      },
+      'publisher': {'@type': 'Organization', 'name': 'Zedu', 'url': '/'},
     };
 
     return Scaffold(
@@ -51,7 +46,10 @@ class DownloadView extends ConsumerWidget {
     );
   }
 
-  Widget _buildStructuredData(BuildContext context, Map<String, dynamic> schemaData) {
+  Widget _buildStructuredData(
+    BuildContext context,
+    Map<String, dynamic> schemaData,
+  ) {
     final localColorScheme = Theme.of(context).colorScheme;
     final jsonString = jsonEncode(schemaData).replaceAllMapped(
       RegExp(r'"([a-zA-Z0-9_]+)":'),
@@ -65,10 +63,7 @@ class DownloadView extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         child: SelectableText(
           jsonString,
-          style: const TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 12,
-          ),
+          style: const TextStyle(fontFamily: 'Roboto', fontSize: 12),
         ),
       ),
     );
@@ -119,17 +114,15 @@ class DownloadView extends ConsumerWidget {
       color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: const Text(
-          'Zedu - Educational Collaboration Platform',
-        ),
+        child: const Text('Zedu - Educational Collaboration Platform'),
       ),
     );
   }
 
   void _launchUrl(BuildContext ctx, String url) {
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      const SnackBar(content: Text('Opening store...')),
-    );
+    ScaffoldMessenger.of(
+      ctx,
+    ).showSnackBar(const SnackBar(content: Text('Opening store...')));
   }
 
   void _launchDesktop(BuildContext ctx) {

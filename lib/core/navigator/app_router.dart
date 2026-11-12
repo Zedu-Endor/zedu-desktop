@@ -1,6 +1,5 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
-import 'package:zedu/features/download/download.dart';
 
 class AppRouter {
   const AppRouter._();
@@ -70,7 +69,10 @@ class AppRouter {
         path: buyCredits,
         builder: (context, state) => const BuyCreditsView(),
       ),
-      GoRoute(path: download, builder: (context, state) => const DownloadView()),
+      GoRoute(
+        path: download,
+        builder: (context, state) => const DownloadView(),
+      ),
     ],
   );
 }
