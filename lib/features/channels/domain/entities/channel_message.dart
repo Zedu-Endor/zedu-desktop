@@ -40,6 +40,10 @@ class ChannelMessage {
   final String? userId;
   final List<ChannelReaction> reactions;
 
+  /// An automatic notice, such as "mimi joined this channel.", rather than
+  /// something a person wrote. Shown as a slim line instead of a message.
+  final bool isSystem;
+
   const ChannelMessage({
     this.id,
     required this.senderName,
@@ -53,7 +57,18 @@ class ChannelMessage {
     this.threadId,
     this.userId,
     this.reactions = const [],
+    this.isSystem = false,
   }) : rawContent = rawContent ?? text;
+
+  /// The backend marks notices with `is_system: true` or a `type` (or
+  /// `message_type` / `event_type`) of `system`, `event` or `notification`.
+  static bool isSystemJson(Map<String, dynamic> json) {
+    if (json['is_system'] == true) return true;
+    final type = (json['type'] ?? json['message_type'] ?? json['event_type'])
+        ?.toString()
+        .toLowerCase();
+    return const {'system', 'event', 'notification'}.contains(type);
+  }
 
   static List<dynamic> mediaFrom(dynamic raw) {
     if (raw is List) {
@@ -100,6 +115,7 @@ class ChannelMessage {
         for (final entry in (json['reactions'] as List? ?? const []))
           if (entry is Map<String, dynamic>) ChannelReaction.fromJson(entry),
       ],
+      isSystem: isSystemJson(json),
     );
   }
 

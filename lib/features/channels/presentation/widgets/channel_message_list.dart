@@ -98,29 +98,38 @@ class ChannelMessageList extends ConsumerWidget {
         }
         final message = messages[index];
         // Only the sender's own, already sent messages can be changed.
-        final own = isMine(message);
-        final tile = ChannelMessageTile(
-          channelId: channelId,
-          message: message,
-          saveAction:
-              message.status == null && (message.threadId ?? message.id) != null
-              ? SaveLaterButton(
-                  channelId: channelId,
-                  threadId: message.threadId ?? message.id!,
-                )
-              : null,
-          onRetry: message.id != null
-              ? () => ref
-                    .read(chatHistoryProvider(channelId))
-                    .retryMessage(message.id!)
-              : null,
-          onEdit: own
-              ? () => _editChannelMessage(context, ref, channelId, message)
-              : null,
-          onDelete: own
-              ? () => _deleteChannelMessage(context, ref, channelId, message)
-              : null,
-        );
+        final own = !message.isSystem && isMine(message);
+        final tile = message.isSystem
+            ? ChannelSystemNotice(message: message)
+            : ChannelMessageTile(
+                channelId: channelId,
+                message: message,
+                saveAction:
+                    message.status == null &&
+                        (message.threadId ?? message.id) != null
+                    ? SaveLaterButton(
+                        channelId: channelId,
+                        threadId: message.threadId ?? message.id!,
+                      )
+                    : null,
+                onRetry: message.id != null
+                    ? () => ref
+                          .read(chatHistoryProvider(channelId))
+                          .retryMessage(message.id!)
+                    : null,
+                onEdit: own
+                    ? () =>
+                          _editChannelMessage(context, ref, channelId, message)
+                    : null,
+                onDelete: own
+                    ? () => _deleteChannelMessage(
+                        context,
+                        ref,
+                        channelId,
+                        message,
+                      )
+                    : null,
+              );
         // Newest first, so the next index is the older neighbour. A day
         // starts at the oldest message or where the older one is another day.
         final time = message.createdAt;
@@ -219,6 +228,63 @@ class ChannelDayDivider extends StatelessWidget {
             Expanded(child: Divider(color: colors.divider)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// An automatic notice, such as "mimi joined this channel. @ada and 5 others
+/// also joined.", as one slim muted line: a small icon instead of an avatar,
+/// 13px grey text with the @-names in plain semibold (no "@"), and a small
+/// time at the right. It has no actions, so it can't be taken for a message
+/// someone wrote.
+class ChannelSystemNotice extends StatelessWidget {
+  const ChannelSystemNotice({super.key, required this.message});
+
+  final ChannelMessage message;
+
+  static final _mention = RegExp(r'@([A-Za-z0-9_.-]+)');
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final time = message.createdAt;
+    final text = message.text;
+    final base = TextStyle(fontSize: 13, color: colors.textSecondary);
+    final name = base.copyWith(fontWeight: FontWeight.w600);
+
+    final spans = <TextSpan>[];
+    var start = 0;
+    for (final match in _mention.allMatches(text)) {
+      if (match.start > start) {
+        spans.add(TextSpan(text: text.substring(start, match.start)));
+      }
+      spans.add(TextSpan(text: match.group(1), style: name));
+      start = match.end;
+    }
+    if (start < text.length) spans.add(TextSpan(text: text.substring(start)));
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 10),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, size: 14, color: colors.textHint),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(style: base, children: spans),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (time != null) ...[
+            const SizedBox(width: 12),
+            Text(
+              TimeOfDay.fromDateTime(time).format(context),
+              style: TextStyle(fontSize: 11, color: colors.textHint),
+            ),
+          ],
+        ],
       ),
     );
   }
