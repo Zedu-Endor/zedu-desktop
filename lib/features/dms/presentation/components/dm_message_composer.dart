@@ -520,7 +520,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         ?.messages;
     if (messages == null) return null;
     for (final message in messages) {
+      // A notice such as "You joined this channel." isn't the user's to edit.
       if (message.userId == me &&
+          !message.isSystem &&
           message.threadId != null &&
           message.text.isNotEmpty) {
         return message;

@@ -105,6 +105,9 @@ void main() {
         overrides: [
           channelRepositoryProvider.overrideWithValue(repository),
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+          // The real notifier loads workspaces through the locator's
+          // AppConfig, which these tests don't register.
+          workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
           chatHistoryProvider.overrideWith(
             (ref, channelId) => chatNotifier ?? fakeChatHistory,
           ),
@@ -859,5 +862,91 @@ void main() {
 
     expect(find.text('Optimistic message'), findsOneWidget);
     expect(find.byIcon(Icons.add_reaction_outlined), findsNothing);
+  });
+
+  group('system notices (Ziki #31)', () {
+    const notice = ChannelMessage(
+      id: 'n-1',
+      threadId: 'n-1',
+      senderName: 'mimi',
+      text: 'mimi joined this channel. @ada_l and 5 others also joined.',
+      userId: 'me-1',
+      isSystem: true,
+    );
+    const message = ChannelMessage(
+      id: 'm-1',
+      threadId: 'm-1',
+      senderName: 'Ada',
+      text: 'hello all',
+      userId: 'u-2',
+    );
+
+    testWidgets('a notice is one slim line, not a message block', (
+      tester,
+    ) async {
+      await pumpList(tester, const Success([message, notice]));
+
+      final slim = find.byType(ChannelSystemNotice);
+      expect(slim, findsOneWidget);
+      // Names keep no "@", and the notice has no avatar, sender or actions.
+      expect(
+        find.descendant(
+          of: slim,
+          matching: find.text(
+            'mimi joined this channel. ada_l and 5 others also joined.',
+            findRichText: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: slim, matching: find.byType(CircleAvatar)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: slim, matching: find.byType(SaveLaterButton)),
+        findsNothing,
+      );
+      // The person's message is still a full message.
+      expect(find.byType(ChannelMessageTile), findsOneWidget);
+      expect(
+        tester.getSize(slim).height,
+        lessThan(tester.getSize(find.byType(ChannelMessageTile)).height),
+      );
+    });
+
+    testWidgets('the @-names are semibold and the rest is muted 13px text', (
+      tester,
+    ) async {
+      await pumpList(tester, const Success([notice]));
+
+      // The icon is a RichText too, so pick the one holding the notice.
+      final rich = tester.widget<RichText>(
+        find.descendant(
+          of: find.byType(ChannelSystemNotice),
+          matching: find.byWidgetPredicate(
+            (w) => w is RichText && w.text.toPlainText().contains('joined'),
+          ),
+        ),
+      );
+      // Text.rich wraps the notice's span in one carrying the default style.
+      final line = (rich.text as TextSpan).children!.single as TextSpan;
+      expect(line.style?.fontSize, 13);
+      final nameSpan = line.children!.whereType<TextSpan>().firstWhere(
+        (s) => s.text == 'ada_l',
+      );
+      expect(nameSpan.style?.fontWeight, FontWeight.w600);
+    });
+
+    testWidgets('your own join notice gets no edit or delete menu', (
+      tester,
+    ) async {
+      await pumpList(tester, const Success([notice]));
+
+      expect(
+        find.byKey(const ValueKey('channel-message-actions')),
+        findsNothing,
+      );
+    });
   });
 }

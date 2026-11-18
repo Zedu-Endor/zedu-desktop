@@ -18,6 +18,35 @@ void main() {
     expect(message.createdAt, DateTime.utc(2026, 10, 21, 5, 14, 46).toLocal());
   });
 
+  group('ChannelMessage.fromJson isSystem (Ziki #31)', () {
+    for (final (name, extra) in [
+      ('type system', {'type': 'system'}),
+      ('is_system true', {'is_system': true}),
+      ('message_type event', {'message_type': 'event'}),
+      ('event_type notification', {'event_type': 'Notification'}),
+    ]) {
+      test('marks a notice with $name', () {
+        final message = ChannelMessage.fromJson({
+          'thread_id': 't-1',
+          'username': 'mimi',
+          'message': 'mimi joined this channel.',
+          ...extra,
+        });
+        expect(message.isSystem, isTrue);
+      });
+    }
+
+    test('leaves a person\'s message, even about joining, as a message', () {
+      final message = ChannelMessage.fromJson({
+        'thread_id': 't-2',
+        'username': 'ada',
+        'message': 'I joined this channel yesterday',
+        'type': 'message',
+      });
+      expect(message.isSystem, isFalse);
+    });
+  });
+
   test('ChannelMessage.fromJson falls back and strips HTML', () {
     final message = ChannelMessage.fromJson({
       'full_name': ' ',
