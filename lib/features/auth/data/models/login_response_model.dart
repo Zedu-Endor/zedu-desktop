@@ -1,4 +1,4 @@
-import 'package:zedu/features/features.dart';
+import "package:zedu/features/features.dart";
 
 class LoginResponseModel {
   const LoginResponseModel({
@@ -13,19 +13,56 @@ class LoginResponseModel {
   final DateTime accessTokenExpiresIn;
   final String notificationToken;
 
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    if (raw is int) {
+      return raw > 100000000000
+          ? DateTime.fromMillisecondsSinceEpoch(raw)
+          : DateTime.fromMillisecondsSinceEpoch(raw * 1000);
+    }
+    if (raw is num) {
+      final val = raw.toInt();
+      return val > 100000000000
+          ? DateTime.fromMillisecondsSinceEpoch(val)
+          : DateTime.fromMillisecondsSinceEpoch(val * 1000);
+    }
+    if (raw is String) {
+      final trimmed = raw.trim();
+      final seconds = int.tryParse(trimmed);
+      if (seconds != null) {
+        return seconds > 100000000000
+            ? DateTime.fromMillisecondsSinceEpoch(seconds)
+            : DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+      }
+      final iso = DateTime.tryParse(trimmed);
+      if (iso != null) return iso;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
   factory LoginResponseModel.fromJson(Map<String, dynamic> json) {
+    final rawUser = json["user"];
+    if (rawUser is! Map) {
+      throw const FormatException('Login response has no user object');
+    }
+
     return LoginResponseModel(
-      user: UserModel.fromJson(json['user'] as Map<String, dynamic>),
-      accessToken: json['access_token'] as String,
-      accessTokenExpiresIn: DateTime.fromMillisecondsSinceEpoch(
-        int.parse(json['access_token_expires_in'] as String) * 1000,
-      ),
-      notificationToken: json['notification_token'] as String,
+      user: UserModel.fromJson(Map<String, dynamic>.from(rawUser)),
+      accessToken: json["access_token"] as String? ?? "",
+      accessTokenExpiresIn: _parseDate(json["access_token_expires_in"]),
+      notificationToken: json["notification_token"] as String? ?? "",
     );
   }
 
-  // static const Map<String, dynamic> _mockLoginResponse = {
-  //   "access_token": "mock-access-token-123",};
+  Map<String, dynamic> toJson() => {
+    "user": user.toJson(),
+    "access_token": accessToken,
+    "access_token_expires_in": accessTokenExpiresIn.toIso8601String(),
+    "notification_token": notificationToken,
+  };
+
   static final String _mockAccessToken = [
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
     "eyJhY2Nlc3NfdXVpZCI6IjAxOWUxMDFiLTYzZmItN2Y5Zi04MTBlLWE1NjAzMjllYTRhNCIsImF1dGhvcmlzZWQiOnRydWUsImV4cCI6MTc3ODk5MTQ5MSwib3JnX2lkIjoiMDE5ZTBmNTYtNmJhYi03ZjlmLWE3ZmMtZDExOWU1ZGI1ODhiIiwicm9sZV9pZCI6bnVsbCwidXNlcl9pZCI6IjAxOWUwZjU2LTZiMDYtN2Y5ZS1hZDlkLTgyMDExYmNiNWUxYiJ9",
@@ -34,7 +71,6 @@ class LoginResponseModel {
 
   static final Map<String, dynamic> _mockLoginResponse = {
     "access_token": _mockAccessToken,
-
     "access_token_expires_in": "1778991491",
     "notification_token": "IAK0C6kd9KBCyuky8RbN0Fh2pONDgzjK",
     "user": {

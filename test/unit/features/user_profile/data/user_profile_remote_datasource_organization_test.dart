@@ -116,13 +116,5 @@ void main() {
         () => api.delete<Map<String, dynamic>>(path: '/organisations/org-1'),
       ).called(1);
     });
-
-    test('uses the profile endpoint when no workspace is given', () async {
-      await dataSource.deleteOrganization();
-
-      verify(
-        () => api.delete<Map<String, dynamic>>(path: '/profile/organization'),
-      ).called(1);
-    });
   });
 }

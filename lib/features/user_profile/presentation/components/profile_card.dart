@@ -18,9 +18,9 @@ class ProfileCard extends StatelessWidget {
       width: width,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.background,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: context.colors.divider),
       ),
       child: child,
     );

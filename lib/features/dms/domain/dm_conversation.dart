@@ -35,6 +35,15 @@ class DmConversation {
 
   String get displayName => username.isNotEmpty ? username : 'Unknown';
 
+  /// True when this is the signed-in user's own space: a DM with themselves.
+  bool isOwnSpaceFor(String? userId) =>
+      userId != null && userId.isNotEmpty && participantId == userId;
+
+  /// Tells conversations apart for selection and drafts. Someone you haven't
+  /// messaged yet has no channel, so their row is identified by the person.
+  String get conversationKey =>
+      channelId.isNotEmpty ? channelId : 'new-dm:$participantId';
+
   String? get effectiveAvatarUrl => (avatarUrl != null && avatarUrl!.isNotEmpty)
       ? avatarUrl
       : defaultAvatarUrl;
@@ -42,6 +51,9 @@ class DmConversation {
   /// False when the conversation has no messages and was never read, so
   /// [lastActivityAt] is only the epoch-0 placeholder used for sorting.
   bool get hasActivity => previewThreads.isNotEmpty || lastReadAt != null;
+
+  /// Whether the conversation has messages the user has not read yet.
+  bool get isUnread => unreadCount > 0;
 
   DateTime get lastActivityAt {
     if (previewThreads.isNotEmpty) {
@@ -75,15 +87,22 @@ class DmConversation {
       isFavourite: json['is_favourite'] as bool? ?? false,
       threadCount: json['thread_count'] as int? ?? 0,
       lastThreadId: json['last_thread_id'] as String?,
-      lastReadAt: json['last_read_at'] != null
-          ? DateTime.tryParse(json['last_read_at'] as String)?.toLocal()
-          : null,
+      lastReadAt: _parseLastReadAt(json['last_read_at']),
       previewMessage: json['preview_message'] as String? ?? '',
       previewThreads: threads,
       participants: participantsList,
       unreadCount:
           json['unread_count'] as int? ?? json['thread_count'] as int? ?? 0,
     );
+  }
+
+  /// A Go zero time arrives as 0001-01-01T00:00:00Z. Treat it, and the old
+  /// 1970 epoch placeholder, as "never read" so empty DMs have no time label.
+  static DateTime? _parseLastReadAt(dynamic value) {
+    if (value is! String) return null;
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null || parsed.year < 2000) return null;
+    return parsed.toLocal();
   }
 
   static String? _nonEmpty(dynamic value) {

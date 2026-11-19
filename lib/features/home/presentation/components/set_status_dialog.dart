@@ -41,6 +41,13 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
     final current = ref.read(authNotifierProvider).user?.status;
     _textCtrl = TextEditingController(text: current?.text ?? '');
     _selectedEmoji = current?.emoji;
+    _pauseNotifications = current?.pauseNotifications ?? false;
+    // A status saved with "Don't remove" is the only one without an expiry.
+    if (current != null &&
+        current.hasCustomStatus &&
+        current.expiresAt == null) {
+      _timeout = StatusTimeout.dontRemove;
+    }
   }
 
   @override
@@ -49,8 +56,8 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
     super.dispose();
   }
 
-  /// The preset whose emoji, text and timeout all match the current form
-  /// values, or null once the user edits them into a custom status.
+  /// The suggestion that matches the current emoji, text and expiry, if any.
+  /// Editing any of them clears the selection; restoring them reselects it.
   _StatusPreset? get _selectedPreset {
     final text = _textCtrl.text.trim();
     for (final preset in _presets) {
@@ -75,7 +82,6 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
     if (_isSaving) return;
     setState(() => _isSaving = true);
 
-    final online = ref.read(authNotifierProvider).user?.status.online ?? true;
     final success = await ref
         .read(authNotifierProvider.notifier)
         .changeStatus(
@@ -83,7 +89,6 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
           text: _textCtrl.text.trim(),
           timeout: _timeout,
           pauseNotifications: _pauseNotifications,
-          online: online,
         );
 
     if (!mounted) return;
@@ -110,232 +115,252 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.background,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header ─────────────────────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Set a status',
-                      style: context.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: colors.textHint, size: 20),
-                    splashRadius: 18,
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // ── Status text field with emoji prefix ────────────────────────
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: colors.borderOutline),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            Navigator.of(context).pop(),
+      },
+      child: Dialog(
+        backgroundColor: colors.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Header ─────────────────────────────────────────────────────
+                Row(
                   children: [
-                    // Emoji picker trigger
-                    InkWell(
-                      onTap: _pickEmoji,
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(8),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        child: _selectedEmoji != null
-                            ? Text(
-                                _selectedEmoji!,
-                                style: const TextStyle(fontSize: 20),
-                              )
-                            : Icon(
-                                Icons.sentiment_satisfied_alt_outlined,
-                                color: colors.textHint,
-                                size: 22,
-                              ),
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 28,
-                      color: colors.borderOutline,
-                    ),
-                    // Text input
                     Expanded(
-                      child: TextField(
-                        controller: _textCtrl,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: "What's your status?",
-                          hintStyle: context.textTheme.bodyMedium?.copyWith(
-                            color: colors.textHint,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          isDense: true,
-                        ),
-                        style: context.textTheme.bodyMedium?.copyWith(
+                      child: Text(
+                        'Set a status',
+                        style: context.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                           color: colors.textPrimary,
                         ),
-                        maxLength: 100,
-                        buildCounter:
-                            (
-                              _, {
-                              required currentLength,
-                              maxLength,
-                              required isFocused,
-                            }) => null,
                       ),
                     ),
-                    // Clear button
-                    if (_textCtrl.text.isNotEmpty || _selectedEmoji != null)
-                      IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 16,
-                          color: colors.textHint,
-                        ),
-                        splashRadius: 14,
-                        onPressed: () => setState(() {
-                          _textCtrl.clear();
-                          _selectedEmoji = null;
-                        }),
-                      ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: colors.textHint, size: 20),
+                      tooltip: 'Close',
+                      splashRadius: 18,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // ── Quick-pick presets ─────────────────────────────────────────
-              Text(
-                'Suggested',
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: colors.textHint,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...[
-                for (final preset in _presets)
-                  _PresetTile(
-                    preset: preset,
-                    selected: preset == _selectedPreset,
-                    onTap: () => _applyPreset(preset),
+                // ── Status text field with emoji prefix ────────────────────────
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: colors.borderOutline),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-              ],
-              const SizedBox(height: 20),
-
-              // ── Remove after dropdown ──────────────────────────────────────
-              Text(
-                'Remove status after…',
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: colors.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 6),
-              _TimeoutDropdown(
-                value: _timeout,
-                onChanged: (v) => setState(() => _timeout = v),
-              ),
-              const SizedBox(height: 16),
-
-              // ── Pause notifications checkbox ───────────────────────────────
-              Row(
-                children: [
-                  Checkbox(
-                    value: _pauseNotifications,
-                    activeColor: colors.primary,
-                    onChanged: (v) =>
-                        setState(() => _pauseNotifications = v ?? false),
-                  ),
-                  GestureDetector(
-                    onTap: () => setState(
-                      () => _pauseNotifications = !_pauseNotifications,
-                    ),
-                    child: Text(
-                      'Pause notifications',
-                      style: context.textTheme.bodyMedium?.copyWith(
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // ── Actions ────────────────────────────────────────────────────
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: _isSaving
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colors.textPrimary,
-                      side: BorderSide(color: colors.borderOutline),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton(
-                    onPressed: _isSaving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.primary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 28,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Save',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                  child: Row(
+                    children: [
+                      // Emoji picker trigger
+                      Semantics(
+                        label: 'Choose status emoji',
+                        button: true,
+                        child: InkWell(
+                          onTap: _pickEmoji,
+                          mouseCursor: SystemMouseCursors.click,
+                          borderRadius: const BorderRadius.horizontal(
+                            left: Radius.circular(8),
                           ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            child: _selectedEmoji != null
+                                ? Text(
+                                    _selectedEmoji!,
+                                    style: const TextStyle(fontSize: 20),
+                                  )
+                                : Icon(
+                                    Icons.sentiment_satisfied_alt_outlined,
+                                    color: colors.textHint,
+                                    size: 22,
+                                  ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 28,
+                        color: colors.borderOutline,
+                      ),
+                      // Text input
+                      Expanded(
+                        child: TextField(
+                          controller: _textCtrl,
+                          decoration: InputDecoration(
+                            hintText: "What's your status?",
+                            hintStyle: context.textTheme.bodyMedium?.copyWith(
+                              color: colors.textHint,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            isDense: true,
+                          ),
+                          style: context.textTheme.bodyMedium?.copyWith(
+                            color: colors.textPrimary,
+                          ),
+                          maxLength: 100,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) {
+                            if (!_isSaving) _save();
+                          },
+                          // Rebuild so the clear button and the selected suggestion follow the text.
+                          onChanged: (_) => setState(() {}),
+                          buildCounter:
+                              (
+                                _, {
+                                required currentLength,
+                                maxLength,
+                                required isFocused,
+                              }) => null,
+                        ),
+                      ),
+                      // Clear button
+                      if (_textCtrl.text.isNotEmpty || _selectedEmoji != null)
+                        IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: colors.textHint,
+                          ),
+                          splashRadius: 14,
+                          onPressed: () => setState(() {
+                            _textCtrl.clear();
+                            _selectedEmoji = null;
+                          }),
+                        ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Quick-pick presets ─────────────────────────────────────────
+                Text(
+                  'Suggested',
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.textHint,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...[
+                  for (final preset in _presets)
+                    _PresetTile(
+                      preset: preset,
+                      selected: preset == _selectedPreset,
+                      onTap: () => _applyPreset(preset),
+                    ),
                 ],
-              ),
-            ],
+                const SizedBox(height: 20),
+
+                // ── Remove after dropdown ──────────────────────────────────────
+                Text(
+                  'Remove status after…',
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _TimeoutDropdown(
+                  value: _timeout,
+                  onChanged: (v) => setState(() => _timeout = v),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Pause notifications checkbox ───────────────────────────────
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _pauseNotifications,
+                      activeColor: colors.primary,
+                      onChanged: (v) =>
+                          setState(() => _pauseNotifications = v ?? false),
+                    ),
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => setState(
+                          () => _pauseNotifications = !_pauseNotifications,
+                        ),
+                        child: Text(
+                          'Pause notifications',
+                          style: context.textTheme.bodyMedium?.copyWith(
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ── Actions ────────────────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _isSaving
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colors.textPrimary,
+                        side: BorderSide(color: colors.borderOutline),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 12),
+                    FilledButton(
+                      onPressed: _isSaving ? null : _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Save',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -352,6 +377,7 @@ class _StatusPreset {
   final StatusTimeout timeout;
 }
 
+/// One suggested status. The selected one is highlighted and has a check mark.
 class _PresetTile extends StatelessWidget {
   const _PresetTile({
     required this.preset,
@@ -367,41 +393,46 @@ class _PresetTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final radius = BorderRadius.circular(8);
-    return Material(
-      color: selected ? colors.primaryBg : Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: selected ? BorderSide(color: colors.primary) : BorderSide.none,
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
-          child: Row(
-            children: [
-              Text(preset.emoji, style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  preset.label,
-                  style: context.textTheme.bodyMedium?.copyWith(
-                    color: colors.textPrimary,
-                    fontWeight: selected ? FontWeight.w600 : null,
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? colors.primaryBg : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: selected ? BorderSide(color: colors.primary) : BorderSide.none,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          mouseCursor: SystemMouseCursors.click,
+          borderRadius: radius,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+            child: Row(
+              children: [
+                Text(preset.emoji, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    preset.label,
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      color: colors.textPrimary,
+                      fontWeight: selected ? FontWeight.w600 : null,
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                '– ${preset.timeout.label}',
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: selected ? colors.primary : colors.textHint,
+                Text(
+                  '– ${preset.timeout.label}',
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: selected ? colors.primary : colors.textHint,
+                  ),
                 ),
-              ),
-              if (selected) ...[
-                const SizedBox(width: 8),
-                Icon(Icons.check_circle, size: 18, color: colors.primary),
+                if (selected) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.check_circle, size: 18, color: colors.primary),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

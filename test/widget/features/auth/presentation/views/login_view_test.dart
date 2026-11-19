@@ -19,6 +19,12 @@ class FakeAuthNotifier extends AuthNotifier {
   final void Function(String email, String password)? _onLogin;
   final Future<void>? _pendingLogin;
   bool? lastRememberMe;
+  bool? lastGoogleRememberMe;
+
+  @override
+  Future<void> loginWithGoogle({bool rememberMe = true}) async {
+    lastGoogleRememberMe = rememberMe;
+  }
 
   @override
   AuthState build() => _initial;
@@ -38,6 +44,18 @@ class FakeAuthNotifier extends AuthNotifier {
 
   @override
   Future<void> logout() async {
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  int retryCount = 0;
+
+  @override
+  Future<void> retrySessionRestore() async {
+    retryCount++;
+  }
+
+  @override
+  void showLoginForm() {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 }
@@ -137,6 +155,25 @@ void main() {
       ]);
     });
 
+    testWidgets('sends the password exactly as typed', (tester) async {
+      final attempts = <(String, String)>[];
+      await pumpDesktopLogin(
+        tester,
+        FakeAuthNotifier(
+          onLogin: (email, password) => attempts.add((email, password)),
+        ),
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        ' user@example.com ',
+      );
+      await tester.enterText(find.byType(TextFormField).at(1), ' Secret123 ');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(attempts, [('user@example.com', ' Secret123 ')]);
+    });
+
     testWidgets(
       'Enter does not submit while authentication is already loading',
       (tester) async {
@@ -220,6 +257,53 @@ void main() {
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Login to Zedu'), findsNothing);
+    });
+
+    group('when the saved session could not be checked', () {
+      const failedRestore = AuthState(
+        status: AuthStatus.unauthenticated,
+        error: 'No connection',
+        sessionRestoreFailed: true,
+      );
+
+      testWidgets('shows the retry screen instead of the form', (tester) async {
+        await tester.pumpWidget(
+          buildLoginViewUnderTest(
+            notifier: FakeAuthNotifier(initial: failedRestore),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text("Can't reach Zedu"), findsOneWidget);
+        expect(find.text('No connection'), findsOneWidget);
+        expect(find.text('Login to Zedu'), findsNothing);
+      });
+
+      testWidgets('Retry tries the saved session again', (tester) async {
+        final notifier = FakeAuthNotifier(initial: failedRestore);
+        await tester.pumpWidget(buildLoginViewUnderTest(notifier: notifier));
+        await tester.pump();
+
+        await tester.tap(find.text('Retry'));
+        await tester.pump();
+
+        expect(notifier.retryCount, 1);
+      });
+
+      testWidgets('the login form is still available', (tester) async {
+        await tester.pumpWidget(
+          buildLoginViewUnderTest(
+            notifier: FakeAuthNotifier(initial: failedRestore),
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(find.text('Log in with a password instead'));
+        await tester.pump();
+
+        expect(find.text("Can't reach Zedu"), findsNothing);
+        expect(find.text('Login to Zedu'), findsOneWidget);
+      });
     });
 
     testWidgets('shows validation errors when submitting empty form', (
@@ -395,6 +479,20 @@ void main() {
       );
     });
 
+    testWidgets('aligns the Remember me checkbox with the form fields', (
+      tester,
+    ) async {
+      await pumpDesktopLogin(tester, FakeAuthNotifier());
+
+      final checkboxRect = tester.getRect(find.byType(Checkbox));
+      final fieldRect = tester.getRect(find.byType(TextFormField).first);
+      final labelRect = tester.getRect(find.text('Remember me'));
+
+      expect(checkboxRect.left, moreOrLessEquals(fieldRect.left));
+      expect(checkboxRect.width, lessThan(40));
+      expect(labelRect.left - checkboxRect.right, moreOrLessEquals(8));
+    });
+
     for (final ticked in [false, true]) {
       testWidgets('passes Remember me = $ticked to login', (tester) async {
         final notifier = FakeAuthNotifier();
@@ -418,6 +516,79 @@ void main() {
 
         expect(notifier.lastRememberMe, ticked);
       });
+
+      testWidgets('passes Remember me =  to loginWithGoogle', (tester) async {
+        final notifier = FakeAuthNotifier();
+        await pumpDesktopLogin(tester, notifier);
+
+        if (ticked) {
+          await tester.ensureVisible(find.byType(Checkbox));
+          await tester.tap(find.byType(Checkbox));
+          await tester.pump();
+        }
+
+        final googleButton = find.widgetWithText(
+          SocialAuthButton,
+          'Sign in with Google',
+        );
+        await tester.ensureVisible(googleButton);
+        await tester.tap(googleButton);
+        await tester.pumpAndSettle();
+
+        expect(notifier.lastGoogleRememberMe, ticked);
+      });
     }
+
+    testWidgets('centers the login with magic link link beneath the button', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(buildLoginViewUnderTest());
+      await tester.pumpAndSettle();
+
+      final linkText = find.text('Login with magic link');
+      expect(linkText, findsOneWidget);
+
+      final align = tester.widget<Align>(
+        find.ancestor(of: linkText, matching: find.byType(Align)).first,
+      );
+      expect(align.alignment, Alignment.center);
+
+      final linkCenter = tester.getCenter(linkText);
+      final buttonCenter = tester.getCenter(
+        find.widgetWithText(ElevatedButton, 'Login'),
+      );
+      expect((linkCenter.dx - buttonCenter.dx).abs(), lessThan(1.0));
+    });
+
+    testWidgets('Tab moves directly from email to password', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1024));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(buildLoginViewUnderTest());
+      await tester.pump();
+
+      await tester.tap(find.byType(TextFormField).at(0));
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+
+      final passwordField = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byType(TextFormField).at(1),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(passwordField.focusNode.hasFocus, isTrue);
+    });
+    testWidgets('disposes tap gesture recognizers cleanly on unmount', (
+      tester,
+    ) async {
+      await pumpDesktopLogin(tester, FakeAuthNotifier());
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(find.byType(LoginView), findsNothing);
+    });
   });
 }

@@ -29,4 +29,27 @@ void main() {
       },
     );
   });
+
+  group('AppConfig API host default', () {
+    setUpAll(() {
+      // Mirror an absent `API_BASE_URL` so fromEnvironment has to fall back.
+      dotenv.loadFromString(envString: 'API_BASE_URL=');
+    });
+
+    test('release builds default to the production host', () {
+      expect(defaultApiBaseUrl(isRelease: true), kProductionApiBaseUrl);
+      expect(kProductionApiBaseUrl, 'https://api.zedu.chat/api/v1/');
+    });
+
+    test('debug and profile builds default to staging', () {
+      expect(defaultApiBaseUrl(isRelease: false), kStagingApiBaseUrl);
+      expect(kStagingApiBaseUrl, 'https://api.staging.zedu.chat/api/v1/');
+    });
+
+    test('fromEnvironment uses the build-mode default', () {
+      final config = AppConfig.fromEnvironment();
+
+      expect(config.apiBaseUrl, defaultApiBaseUrl(isRelease: kReleaseMode));
+    });
+  });
 }

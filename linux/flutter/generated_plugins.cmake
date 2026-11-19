@@ -7,6 +7,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   flutter_secure_storage_linux
   gtk
+  hotkey_manager_linux
   irondash_engine_context
   local_notifier
   record_linux

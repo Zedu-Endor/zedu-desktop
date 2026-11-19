@@ -6,11 +6,13 @@ class BillingSection extends ConsumerStatefulWidget {
     super.key,
     required this.billing,
     required this.onInvite,
+    required this.onComparePlans,
   });
 
   final BillingInfo billing;
   final Future<void> Function({required String email, required String role})
   onInvite;
+  final VoidCallback onComparePlans;
 
   @override
   ConsumerState<BillingSection> createState() => _BillingSectionState();
@@ -46,52 +48,89 @@ class _BillingSectionState extends ConsumerState<BillingSection> {
             color: colors.primaryBg,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final planSummary = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.billing.plan,
+                    style: context.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.billing.description,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: colors.textSecondary.withValues(alpha: 0.6),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+              final actions = Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () =>
+                        showInviteMemberDialog(context, widget.onInvite),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.primary,
+                      side: BorderSide(color: colors.borderOutline),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    child: const Text(
+                      'Invite People',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: widget.onComparePlans,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    child: const Text(
+                      'Compare Plans',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 680) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Zedu Free',
-                      style: context.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'You are enjoying the full Zedu experience with the ability to add as many users to your organization.',
-                      style: context.textTheme.bodySmall?.copyWith(
-                        color: colors.textSecondary.withValues(alpha: 0.6),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              OutlinedButton(
-                onPressed: () =>
-                    showInviteMemberDialog(context, widget.onInvite),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colors.primary,
-                  side: BorderSide(color: colors.borderOutline),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-                child: const Text(
-                  'Invite People',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
+                  children: [planSummary, const SizedBox(height: 20), actions],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: planSummary),
+                  const SizedBox(width: 24),
+                  actions,
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 48),
@@ -110,33 +149,89 @@ class _BillingSectionState extends ConsumerState<BillingSection> {
         ),
         Container(height: 1, color: colors.divider),
         const SizedBox(height: 48),
-        Center(
-          child: Column(
-            children: [
-              Icon(
-                Icons.receipt_long_outlined,
-                size: 64,
-                color: colors.textSecondary.withValues(alpha: 0.6),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No payment history found.',
-                style: context.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colors.textPrimary,
+        if (widget.billing.paymentHistory.isNotEmpty) ...[
+          ...widget.billing.paymentHistory.map((record) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: colors.divider, width: 1),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Your payment and transaction history will appear here once you start using paid features.',
-                textAlign: TextAlign.center,
-                style: context.textTheme.bodySmall?.copyWith(
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      record.description,
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      record.amount,
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      record.date,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      record.status,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: record.status.toLowerCase() == 'completed'
+                            ? colors.success
+                            : colors.accent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ] else ...[
+          Center(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 64,
                   color: colors.textSecondary.withValues(alpha: 0.6),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Text(
+                  'No payment history found.',
+                  style: context.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your payment and transaction history will appear here once you start using paid features.',
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.textSecondary.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

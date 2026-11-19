@@ -3,11 +3,14 @@ import 'package:zedu/features/features.dart';
 enum UserProfileSection {
   account,
   notifications,
+  desktop,
   security,
   organization,
+  webhooks,
   userManagement,
   rolesAndPermissions,
   billing,
+  channelManagement,
 }
 
 class UserProfileState {
@@ -54,12 +57,18 @@ class UserProfileState {
     String? successMessage,
     bool clearError = false,
     bool clearSuccess = false,
+    bool clearNotifications = false,
+    bool clearOrganization = false,
   }) {
     return UserProfileState(
       section: section ?? this.section,
       account: account ?? this.account,
-      notifications: notifications ?? this.notifications,
-      organization: organization ?? this.organization,
+      notifications: clearNotifications
+          ? null
+          : (notifications ?? this.notifications),
+      organization: clearOrganization
+          ? null
+          : (organization ?? this.organization),
       securitySessions: securitySessions ?? this.securitySessions,
       teamMembers: teamMembers ?? this.teamMembers,
       rolesAndPermissions: rolesAndPermissions ?? this.rolesAndPermissions,

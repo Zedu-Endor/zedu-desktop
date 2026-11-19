@@ -20,6 +20,8 @@ abstract final class AppTheme {
 
   static final ThemeData light = _build(AppPalette.light, Brightness.light);
 
+  static final ThemeData dark = _build(AppPalette.dark, Brightness.dark);
+
   static ThemeData _build(AppPalette palette, Brightness brightness) {
     return ThemeData(
       brightness: palette.brightness,

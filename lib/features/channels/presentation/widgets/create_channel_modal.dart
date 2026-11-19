@@ -27,7 +27,10 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
   }
 
   Future<void> _createChannel() async {
-    if (_nameController.text.trim().isEmpty) return;
+    if (_nameController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Channel name is required');
+      return;
+    }
     // A second tap before the screen rebuilds must not start a second create.
     if (_isCreating) return;
     setState(() {
@@ -46,11 +49,21 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
     if (!mounted) return;
     switch (result) {
       case Success<Channel>():
+        final overlay = Overlay.of(context, rootOverlay: true);
         Navigator.of(context).pop();
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.success,
+          message: 'Channel created',
+        );
       case Failure<Channel>(:final error):
         setState(() {
           _isCreating = false;
-          _errorMessage = error.message;
+          _errorMessage = switch (error.kind) {
+            ApiFailureKind.unknown || ApiFailureKind.parsing =>
+              'Could not create the channel. Please try again.',
+            _ => error.friendlyMessage,
+          };
         });
     }
   }
@@ -97,6 +110,16 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                if (!_isCreating) _createChannel();
+              },
+              onChanged: (_) {
+                if (_errorMessage != null) {
+                  setState(() => _errorMessage = null);
+                }
+              },
               decoration: InputDecoration(
                 hintText: 'e.g. plan-budget',
                 border: OutlineInputBorder(

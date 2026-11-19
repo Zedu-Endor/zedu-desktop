@@ -1,5 +1,6 @@
 export 'account_section.dart';
 export 'billing_section.dart';
+export 'desktop_section.dart';
 export 'notifications_section.dart';
 export 'organization_section.dart';
 export 'roles_and_permissions_section.dart';

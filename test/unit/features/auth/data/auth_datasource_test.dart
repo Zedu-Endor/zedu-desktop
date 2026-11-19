@@ -218,6 +218,52 @@ void main() {
       });
     });
 
+    group('resetPassword', () {
+      test(
+        'calls POST /auth/password-reset/verify with email, token and new password',
+        () async {
+          when(
+            () => mockApi.post<dynamic>(
+              path: '/auth/password-reset/verify',
+              data: {
+                'email': 'user@example.com',
+                'token': '123456',
+                'new_password': 'NewSecret123',
+              },
+            ),
+          ).thenAnswer(
+            (_) async =>
+                const ApiResponseModel<dynamic>(data: null, statusCode: 200),
+          );
+
+          final datasource = AuthRemoteDataSourceImpl(
+            config: const AppConfig(
+              apiBaseUrl: 'https://api.example.com',
+              usesMockData: false,
+            ),
+            apiBaseService: mockApi,
+          );
+
+          await datasource.resetPassword(
+            email: 'user@example.com',
+            token: '123456',
+            newPassword: 'NewSecret123',
+          );
+
+          verify(
+            () => mockApi.post<dynamic>(
+              path: '/auth/password-reset/verify',
+              data: {
+                'email': 'user@example.com',
+                'token': '123456',
+                'new_password': 'NewSecret123',
+              },
+            ),
+          ).called(1);
+        },
+      );
+    });
+
     group('verifyMagicLink', () {
       test('calls POST /auth/magick-link/verify with token', () async {
         when(

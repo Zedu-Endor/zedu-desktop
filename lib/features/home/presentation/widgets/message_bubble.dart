@@ -42,12 +42,42 @@ class _MessageBubbleState extends State<MessageBubble> {
     });
   }
 
+  /// Opens the reaction menu next to the button that was tapped, measured
+  /// from its render box, instead of at a fixed spot on screen (#166).
+  Future<void> _openReactionMenu(BuildContext buttonContext) async {
+    final button = buttonContext.findRenderObject()! as RenderBox;
+    final overlay =
+        Overlay.of(buttonContext).context.findRenderObject()! as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+    final emoji = await showMenu<String>(
+      context: buttonContext,
+      position: position,
+      items: const [
+        PopupMenuItem(value: '👍', child: Text('👍')),
+        PopupMenuItem(value: '❤️', child: Text('❤️')),
+        PopupMenuItem(value: '😂', child: Text('😂')),
+        PopupMenuItem(value: '🎉', child: Text('🎉')),
+        PopupMenuItem(value: '👎', child: Text('👎')),
+      ],
+    );
+    if (emoji != null && mounted) {
+      _addReaction(emoji);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final initial = widget.author.isNotEmpty
-        ? widget.author.substring(0, 1).toUpperCase()
-        : '?';
+    final initial = avatarInitial(widget.author);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -140,58 +170,25 @@ class _MessageBubbleState extends State<MessageBubble> {
                             );
                           }),
                           if (_isHovering)
-                            InkWell(
-                              onTap: () async {
-                                final emoji = await showMenu<String>(
-                                  context: context,
-                                  position: const RelativeRect.fromLTRB(
-                                    100,
-                                    100,
-                                    0,
-                                    0,
-                                  ), // Adjust this or use a button's render box
-                                  items: const [
-                                    PopupMenuItem(
-                                      value: '👍',
-                                      child: Text('👍'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: '❤️',
-                                      child: Text('❤️'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: '😂',
-                                      child: Text('😂'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: '🎉',
-                                      child: Text('🎉'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: '👎',
-                                      child: Text('👎'),
-                                    ),
-                                  ],
-                                );
-                                if (emoji != null) {
-                                  _addReaction(emoji);
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.background,
-                                  border: Border.all(color: colors.divider),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.add_reaction_outlined,
-                                  size: 14,
-                                  color: colors.textHint,
+                            Builder(
+                              builder: (buttonContext) => InkWell(
+                                onTap: () => _openReactionMenu(buttonContext),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colors.background,
+                                    border: Border.all(color: colors.divider),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.add_reaction_outlined,
+                                    size: 14,
+                                    color: colors.textHint,
+                                  ),
                                 ),
                               ),
                             ),
@@ -262,7 +259,7 @@ class _MessageBody extends StatelessWidget {
     final cleanText = text.replaceAll(attachmentRegex, '').trim();
 
     Widget markdownWidget = cleanText.isNotEmpty
-        ? MarkdownBody(
+        ? MarkdownWithCodeBlocks(
             data: cleanText,
             styleSheet: MarkdownStyleSheet(
               p: TextStyle(fontSize: 14, color: colors.textPrimary),
@@ -283,6 +280,9 @@ class _MessageBody extends StatelessWidget {
                 fontFamily: 'monospace',
               ),
             ),
+            onTapLink: (href) {
+              if (href != null) openMessageLink(href);
+            },
           )
         : const SizedBox.shrink();
 

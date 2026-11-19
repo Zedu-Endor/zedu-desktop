@@ -199,4 +199,160 @@ void main() {
       ).called(1);
     });
   });
+
+  group('ChannelNotifier.leaveChannel', () {
+    late MockChannelRepository repository;
+    late ProviderContainer container;
+
+    setUp(() {
+      repository = MockChannelRepository();
+      when(() => repository.fetchChannels(any())).thenAnswer(
+        (_) async =>
+            Success<List<Channel>>([_channel('general'), _channel('random')]),
+      );
+
+      container = ProviderContainer(
+        overrides: [
+          channelRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
+          authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    test(
+      'calls the repository and removes the channel from the list',
+      () async {
+        when(
+          () => repository.leaveChannel(any()),
+        ).thenAnswer((_) async => const Success<void>(null));
+        await container.read(channelProvider.future);
+
+        final result = await container
+            .read(channelProvider.notifier)
+            .leaveChannel('channel-random');
+
+        expect(result, isA<Success<void>>());
+        verify(() => repository.leaveChannel('channel-random')).called(1);
+        expect(
+          container.read(channelProvider).requireValue.map((c) => c.name),
+          ['general'],
+        );
+      },
+    );
+
+    test('keeps the list and returns the error when leaving fails', () async {
+      when(() => repository.leaveChannel(any())).thenAnswer(
+        (_) async => const Failure<void>(ApiFailure(message: 'Not allowed')),
+      );
+      await container.read(channelProvider.future);
+
+      final result = await container
+          .read(channelProvider.notifier)
+          .leaveChannel('channel-random');
+
+      expect(result, isA<Failure<void>>());
+      expect((result as Failure<void>).error.message, 'Not allowed');
+      final state = container.read(channelProvider);
+      expect(state.requireValue.map((c) => c.name), ['general', 'random']);
+      expect(state.hasError, isFalse);
+    });
+  });
+
+  group('ChannelNotifier.archiveChannel', () {
+    late MockChannelRepository repository;
+    late ProviderContainer container;
+
+    setUp(() {
+      repository = MockChannelRepository();
+      when(() => repository.fetchChannels(any())).thenAnswer(
+        (_) async =>
+            Success<List<Channel>>([_channel('general'), _channel('random')]),
+      );
+      when(
+        () => repository.fetchArchivedChannels(any()),
+      ).thenAnswer((_) async => const Success<List<Channel>>([]));
+
+      container = ProviderContainer(
+        overrides: [
+          channelRepositoryProvider.overrideWithValue(repository),
+          workspaceProvider.overrideWith(FakeWorkspaceNotifier.new),
+          authNotifierProvider.overrideWith(FakeAuthNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    test('archiving sends the flag and removes the channel', () async {
+      when(
+        () => repository.archiveChannel(any(), any()),
+      ).thenAnswer((_) async => const Success<void>(null));
+      await container.read(channelProvider.future);
+
+      final result = await container
+          .read(channelProvider.notifier)
+          .archiveChannel(_channel('random'), archived: true);
+
+      expect(result, isA<Success<void>>());
+      verify(() => repository.archiveChannel('channel-random', true)).called(1);
+      expect(container.read(channelProvider).requireValue.map((c) => c.name), [
+        'general',
+      ]);
+    });
+
+    test('unarchiving brings the channel back, not archived', () async {
+      when(
+        () => repository.archiveChannel(any(), any()),
+      ).thenAnswer((_) async => const Success<void>(null));
+      await container.read(channelProvider.future);
+
+      await container
+          .read(channelProvider.notifier)
+          .archiveChannel(
+            _channel('old').copyWith(archived: true),
+            archived: false,
+          );
+
+      verify(() => repository.archiveChannel('channel-old', false)).called(1);
+      final channels = container.read(channelProvider).requireValue;
+      expect(channels.map((c) => c.name), ['general', 'random', 'old']);
+      expect(channels.last.archived, isFalse);
+    });
+
+    test('a success reloads the archived list', () async {
+      when(
+        () => repository.archiveChannel(any(), any()),
+      ).thenAnswer((_) async => const Success<void>(null));
+      await container.read(channelProvider.future);
+      await container.read(archivedChannelsProvider.future);
+      verify(() => repository.fetchArchivedChannels('org-1')).called(1);
+
+      await container
+          .read(channelProvider.notifier)
+          .archiveChannel(_channel('random'), archived: true);
+      await container.read(archivedChannelsProvider.future);
+
+      verify(() => repository.fetchArchivedChannels('org-1')).called(1);
+    });
+
+    test('a failure keeps the list and returns the error', () async {
+      when(() => repository.archiveChannel(any(), any())).thenAnswer(
+        (_) async => const Failure<void>(
+          ApiFailure(message: 'Forbidden', kind: ApiFailureKind.forbidden),
+        ),
+      );
+      await container.read(channelProvider.future);
+
+      final result = await container
+          .read(channelProvider.notifier)
+          .archiveChannel(_channel('random'), archived: true);
+
+      expect(result, isA<Failure<void>>());
+      expect(container.read(channelProvider).requireValue.map((c) => c.name), [
+        'general',
+        'random',
+      ]);
+    });
+  });
 }

@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
   desktop_drop
   flutter_secure_storage_windows
+  hotkey_manager_windows
   iris_method_channel
   irondash_engine_context
   local_notifier

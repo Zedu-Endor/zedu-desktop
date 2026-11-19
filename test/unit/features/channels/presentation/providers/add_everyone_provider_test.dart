@@ -288,6 +288,45 @@ void main() {
       );
     });
 
+    for (final (kind, expected) in [
+      (
+        ApiFailureKind.network,
+        'No internet connection. Check your network and try again.',
+      ),
+      (
+        ApiFailureKind.server,
+        'Something went wrong on our end. Please try again later.',
+      ),
+      (
+        ApiFailureKind.unknown,
+        'Could not add everyone to #general. Please try again.',
+      ),
+      (
+        ApiFailureKind.parsing,
+        'Could not add everyone to #general. Please try again.',
+      ),
+    ]) {
+      test('add-everyone failure $kind returns safe copy', () async {
+        when(
+          () => repository.addMembersToChannel(
+            channelId: any(named: 'channelId'),
+            userIds: any(named: 'userIds'),
+          ),
+        ).thenAnswer(
+          (_) async => Failure(
+            ApiFailure(
+              message: '<html>internal-host failure</html>',
+              kind: kind,
+            ),
+          ),
+        );
+        final result = await makeContainer()
+            .read(addEveryoneToChannelProvider)
+            .call();
+        expect((result as AddEveryoneFailed).message, expected);
+      });
+    }
+
     test('fails with the API message when adding fails', () async {
       when(
         () => repository.addMembersToChannel(
@@ -296,7 +335,10 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => const Failure(
-          ApiFailure(message: 'failed to add users to channel'),
+          ApiFailure(
+            message: 'failed to add users to channel',
+            kind: ApiFailureKind.client,
+          ),
         ),
       );
 

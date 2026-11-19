@@ -209,9 +209,9 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                 ),
                 const SizedBox(width: 8),
                 Switch(
-                  value: true,
+                  value: isFullPage,
                   onChanged: (val) {
-                    ref.read(activeCallProvider.notifier).setFullPage(false);
+                    ref.read(activeCallProvider.notifier).setFullPage(val);
                   },
                   activeThumbColor: colors.primary,
                 ),

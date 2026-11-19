@@ -62,14 +62,14 @@ class CreditPackageCard extends StatelessWidget {
                               package.name,
                               style: context.textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: const Color(0xFF111827),
+                                color: colors.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               package.description,
                               style: context.textTheme.bodySmall?.copyWith(
-                                color: const Color(0xFF6B7280),
+                                color: colors.textSecondary,
                               ),
                             ),
                           ],
@@ -110,13 +110,19 @@ class CreditPackageCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        package.name.toLowerCase() == 'enterprise'
-                            ? 'Contact Sales'
-                            : package.priceLabel,
-                        style: context.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF111827),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            package.name.toLowerCase() == 'enterprise'
+                                ? 'Contact Sales'
+                                : package.priceLabel,
+                            style: context.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -126,7 +132,7 @@ class CreditPackageCard extends StatelessWidget {
                           child: Text(
                             'per month',
                             style: context.textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF6B7280),
+                              color: colors.textSecondary,
                             ),
                           ),
                         ),
@@ -147,7 +153,7 @@ class CreditPackageCard extends StatelessWidget {
                     'Includes:',
                     style: context.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF374151),
+                      color: colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -175,7 +181,7 @@ class CreditPackageCard extends StatelessWidget {
                             child: Text(
                               benefit,
                               style: context.textTheme.bodyMedium?.copyWith(
-                                color: const Color(0xFF4B5563),
+                                color: colors.textSecondary,
                                 height: 1.35,
                               ),
                             ),

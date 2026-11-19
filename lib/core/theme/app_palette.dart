@@ -65,4 +65,25 @@ class AppPalette {
     presenceActive: Color(0xFF22C55E),
     presenceAway: Color(0x661E1E1E),
   );
+
+  static const dark = AppPalette(
+    brightness: Brightness.dark,
+    primary: Color(0xFF6458F5),
+    sidebar: Color(0xFF23234F),
+    accent: Color(0xFF5CCBBA),
+    onPrimary: Color(0xFFFFFFFF),
+    background: Color(0xFF121214),
+    textPrimary: Color(0xFFF5F3FF),
+    textSecondary: Color(0xFFCFCFD6),
+    textHint: Color(0xFF8E8E93),
+    borderOutline: Color(0xff3A3A4A),
+    divider: Color(0xff2E2E38),
+    success: Color(0xFF22C55E),
+    successBg: Color(0xFF123626),
+    error: Color(0xFFF87171),
+    errorBg: Color(0xFF3B1A1A),
+    primaryBg: Color(0xFF2A2650),
+    presenceActive: Color(0xFF22C55E),
+    presenceAway: Color(0x99FFFFFF),
+  );
 }

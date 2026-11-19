@@ -1,10 +1,20 @@
-import 'package:zedu/core/core.dart';
+import 'dart:async';
 
-import '../../data/models/workspace.dart';
-import 'workspace_state.dart';
+import 'package:zedu/core/core.dart';
+import 'package:zedu/features/features.dart';
 
 class WorkspaceNotifier extends Notifier<WorkspaceState> {
   static const loadErrorMessage = "Couldn't load your organisations";
+  static const switchErrorMessage =
+      "Couldn't switch organisation. Please try again.";
+
+  int _latestSwitchId = 0;
+  bool _isSwitchPending = false;
+  Future<void>? _switchInFlight;
+
+  /// The organisation the server's current access token is for, once a switch
+  /// has changed it; null until then.
+  String? _serverOrgId;
 
   @override
   WorkspaceState build() {
@@ -33,12 +43,26 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
       final List<Workspace> workspaces = [];
       for (var item in data) {
         if (item is Map<String, dynamic>) {
+          final rawId = item['id'];
+          final id = rawId is String
+              ? rawId.trim()
+              : (rawId?.toString().trim() ?? '');
+          if (id.isEmpty) {
+            // Without an id the workspace cannot be selected or addressed.
+            // Skipping it is better than collapsing every id-less
+            // organisation onto one shared workspace id.
+            AppLogger.w(
+              'Skipping organisation without an id',
+              tag: 'WorkspaceNotifier',
+            );
+            continue;
+          }
           workspaces.add(
             Workspace(
-              id: item['id'] as String? ?? '1',
+              id: id,
               name: item['name'] as String? ?? 'Workspace',
               avatar: item['logo_url'] as String? ?? '',
-              channelsCount: (item['channels_count'] as num?)?.toInt() ?? 0,
+              membersCount: (item['Users'] as List<dynamic>?)?.length ?? 0,
             ),
           );
         }
@@ -65,7 +89,12 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
         error: e,
         stackTrace: stackTrace,
       );
-      state = const WorkspaceState(errorMessage: loadErrorMessage);
+      // A failed refresh keeps what's already loaded.
+      state = WorkspaceState(
+        workspaces: state.workspaces,
+        selectedWorkspace: state.selectedWorkspace,
+        errorMessage: loadErrorMessage,
+      );
     }
   }
 
@@ -77,28 +106,28 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
         name: 'HNG Workspace',
         avatar: '',
         unreadCount: 1351,
-        channelsCount: 1351,
+        membersCount: 1351,
       ),
       const Workspace(
         id: '2',
         name: 'TeamFlow Collective',
         avatar: '',
         unreadCount: 15,
-        channelsCount: 42,
+        membersCount: 42,
       ),
       const Workspace(
         id: '3',
         name: 'Coffee & Code House',
         avatar: '',
         unreadCount: 0,
-        channelsCount: 12,
+        membersCount: 12,
       ),
       const Workspace(
         id: '4',
         name: 'ConnectHub',
         avatar: '',
         unreadCount: 3,
-        channelsCount: 89,
+        membersCount: 89,
       ),
     ];
 
@@ -118,14 +147,84 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
     );
   }
 
-  Future<void> switchWorkspace(Workspace workspace) async {
-    if (state.selectedWorkspace?.id == workspace.id) return;
+  /// Keeps the name in the list and the selection in step with a rename.
+  void renameWorkspace(String id, String name) {
+    Workspace rename(Workspace w) => w.id == id ? w.copyWith(name: name) : w;
+    final selected = state.selectedWorkspace;
+    state = state.copyWith(
+      workspaces: state.workspaces.map(rename).toList(),
+      selectedWorkspace: selected == null ? null : rename(selected),
+    );
+  }
 
+  /// Makes [workspace] the current organisation and returns an error message
+  /// when that fails, or null otherwise. The server reads the organisation
+  /// from the access token, so it has to hand out a new token for the switch.
+  Future<String?> switchWorkspace(Workspace workspace) async {
+    // The newest selection wins: any switch still waiting below gives up.
+    final switchId = ++_latestSwitchId;
+
+    // The server revokes the token it is called with, so a second call made
+    // before the first ends would send a token that no longer works.
+    while (_switchInFlight != null) {
+      await _switchInFlight;
+    }
+    if (switchId != _latestSwitchId) return null;
+
+    final serverOrgId = _serverOrgId;
+    if (state.selectedWorkspace?.id == workspace.id &&
+        (serverOrgId == null || serverOrgId == workspace.id)) {
+      if (_isSwitchPending) {
+        _isSwitchPending = false;
+        state = state.copyWith(isLoading: false);
+      }
+      return null;
+    }
+
+    _isSwitchPending = true;
     state = state.copyWith(isLoading: true);
+    final inFlight = Completer<void>();
+    _switchInFlight = inFlight.future;
 
-    await Future<void>.delayed(const Duration(milliseconds: 300));
+    try {
+      if (locator<AppConfig>().usesMockData) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      } else {
+        final response = await locator<ApiBaseService>()
+            .put<Map<String, dynamic>>(
+              path: '/users/switch-org',
+              data: {'current_org': workspace.id},
+            );
+        final data = response.data['data'];
+        final token = data is Map ? data['access_token'] : null;
+        if (token is! String || token.isEmpty) {
+          throw const FormatException('switch-org returned no access token');
+        }
+        await locator<SecureStorageService>().replaceAccessToken(token);
+      }
+      _serverOrgId = workspace.id;
+      if (switchId != _latestSwitchId) return null;
 
-    state = state.copyWith(selectedWorkspace: workspace, isLoading: false);
+      // Providers that watch the selection reload after this, with the new
+      // token already in place.
+      _isSwitchPending = false;
+      state = state.copyWith(selectedWorkspace: workspace, isLoading: false);
+      return null;
+    } catch (e, stackTrace) {
+      AppLogger.e(
+        'Failed to switch organisation',
+        tag: 'WorkspaceNotifier',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      if (switchId != _latestSwitchId) return null;
+      _isSwitchPending = false;
+      state = state.copyWith(isLoading: false);
+      return switchErrorMessage;
+    } finally {
+      _switchInFlight = null;
+      inFlight.complete();
+    }
   }
 
   void removeWorkspace(String id) {
@@ -141,6 +240,7 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
     state = state.copyWith(
       workspaces: updatedWorkspaces,
       selectedWorkspace: nextSelected,
+      clearSelectedWorkspace: nextSelected == null,
     );
   }
 }

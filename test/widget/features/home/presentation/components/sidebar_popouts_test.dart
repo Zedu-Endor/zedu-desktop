@@ -71,6 +71,11 @@ class _FakeAuthNotifier extends AuthNotifier {
   );
 }
 
+class _EmptyDmListNotifier extends DmListNotifier {
+  @override
+  Future<List<DmConversation>> build() async => const [];
+}
+
 /// Hovers People in the real rail and returns how many times the profile was
 /// reloaded.
 Future<int> _hoverPeopleAndCountLoads(
@@ -88,6 +93,7 @@ Future<int> _hoverPeopleAndCountLoads(
       overrides: [
         userProfileNotifierProvider.overrideWith(() => notifier),
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+        dmListProvider.overrideWith(_EmptyDmListNotifier.new),
       ],
       child: buildTestMaterialApp(
         const Scaffold(
@@ -184,6 +190,35 @@ void main() {
         await _pumpPeopleCard(tester, const UserProfileState());
 
         expect(find.text('No people to show'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'renders fallback initial for person with empty or emoji name without RangeError',
+      (tester) async {
+        const emptyMember = TeamMember(
+          id: 'u-empty',
+          email: 'empty@zedu.test',
+          role: 'Member',
+          dateJoined: '2026-01-01',
+          status: TeamMemberStatus.active,
+          name: '   ',
+        );
+        const emojiMember = TeamMember(
+          id: 'u-emoji',
+          email: 'emoji@zedu.test',
+          role: 'Member',
+          dateJoined: '2026-01-01',
+          status: TeamMemberStatus.active,
+          name: '🚀 Rocket',
+        );
+        await _pumpPeopleCard(
+          tester,
+          const UserProfileState(teamMembers: [emptyMember, emojiMember]),
+        );
+
+        expect(find.text('?'), findsOneWidget);
+        expect(find.text('🚀'), findsOneWidget);
       },
     );
   });
