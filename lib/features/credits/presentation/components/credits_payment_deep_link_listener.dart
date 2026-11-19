@@ -22,7 +22,9 @@ class _CreditsPaymentDeepLinkListenerState
     extends ConsumerState<CreditsPaymentDeepLinkListener> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
-  String? _lastProcessedSessionId;
+  final _pendingSessions = <String>{};
+  final _verifyingSessions = <String>{};
+  final _verifiedSessions = <String>{};
 
   static const _tag = 'CreditsPaymentDeepLinkListener';
 
@@ -30,6 +32,13 @@ class _CreditsPaymentDeepLinkListenerState
   void initState() {
     super.initState();
     _appLinks = widget.appLinks ?? AppLinks();
+    ref.listenManual(creditsOrgIdProvider, (_, orgId) {
+      if (orgId.isEmpty) return;
+      // A cold-start payment link can arrive before session restoration.
+      for (final sessionId in _pendingSessions.toList()) {
+        unawaited(_verifySession(sessionId));
+      }
+    });
     _initDeepLinks();
   }
 
@@ -43,6 +52,8 @@ class _CreditsPaymentDeepLinkListenerState
       AppLogger.w('Failed to read initial payment deep link', tag: _tag);
     }
 
+    if (!mounted) return;
+
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) => unawaited(_handleUri(uri)),
       onError: (Object error, StackTrace stackTrace) {
@@ -53,35 +64,69 @@ class _CreditsPaymentDeepLinkListenerState
 
   Future<void> _handleUri(Uri uri) async {
     final sessionId = CreditsPaymentDeepLinkParser.extractSessionId(uri);
-    if (sessionId == null || sessionId == _lastProcessedSessionId) return;
-    _lastProcessedSessionId = sessionId;
+    if (sessionId != null) await _verifySession(sessionId);
+  }
 
-    final user = ref.read(authNotifierProvider).user;
-    final orgId = user?.currentOrg;
-    if (orgId == null || orgId.isEmpty) return;
+  Future<void> _verifySession(String sessionId) async {
+    if (!mounted ||
+        _verifiedSessions.contains(sessionId) ||
+        _verifyingSessions.contains(sessionId)) {
+      return;
+    }
 
+    // The purchase was made for the workspace selected in the sidebar.
+    final orgId = ref.read(creditsOrgIdProvider);
+    if (orgId.isEmpty) {
+      _pendingSessions.add(sessionId);
+      return;
+    }
+
+    _pendingSessions.remove(sessionId);
+    _verifyingSessions.add(sessionId);
     AppLogger.i('Verifying credit payment session', tag: _tag);
-    final verified = await ref
-        .read(creditsNotifierProvider.notifier)
-        .verifyPayment(sessionId: sessionId, orgId: orgId);
+    final bool verified;
+    try {
+      verified = await ref
+          .read(creditsNotifierProvider.notifier)
+          .verifyPayment(sessionId: sessionId, orgId: orgId);
+    } catch (error) {
+      AppLogger.w('Failed to verify credit payment session', tag: _tag);
+      return;
+    } finally {
+      // Failure leaves the session available for an explicit retry.
+      _verifyingSessions.remove(sessionId);
+    }
 
     if (!mounted) return;
+    if (verified) _verifiedSessions.add(sessionId);
+
+    // Mounted from `App`'s builder, above the Navigator: see the note in
+    // AuthDeepLinkListener.
+    final navigator = AppRouter.navigatorKey.currentState;
+    if (navigator == null) return;
 
     if (verified) {
-      AppToastService.show(
-        context,
+      AppToastService.showAtRoot(
+        navigator,
         type: AppToastType.success,
         message: 'AI credits purchased successfully!',
       );
-      if (GoRouterState.of(context).uri.path != AppRouter.buyCredits) {
-        context.go(AppRouter.buyCredits);
+      if (GoRouter.of(
+            navigator.context,
+          ).routerDelegate.currentConfiguration.uri.path !=
+          AppRouter.buyCredits) {
+        navigator.context.go(AppRouter.buyCredits);
       }
       return;
     }
 
     final error = ref.read(creditsNotifierProvider).error;
     if (error != null) {
-      AppToastService.show(context, type: AppToastType.error, message: error);
+      AppToastService.showAtRoot(
+        navigator,
+        type: AppToastType.error,
+        message: error,
+      );
     }
   }
 

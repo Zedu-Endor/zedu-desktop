@@ -22,4 +22,8 @@ void setupLocator() {
   locator.registerLazySingleton<ApiBaseService>(
     () => ApiBaseService(config: config, dio: dio),
   );
+
+  locator.registerLazySingleton<WindowHotkeyController>(
+    () => WindowHotkeyController(window: windowManager, storage: storage),
+  );
 }

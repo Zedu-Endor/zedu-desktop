@@ -22,6 +22,11 @@ class SecureStorageService {
     }
   }
 
+  /// Swaps in a new token for the signed-in session, keeping whether it is
+  /// remembered across launches the same as when the user signed in.
+  Future<void> replaceAccessToken(String token) =>
+      saveAccessToken(token, persist: _sessionToken == null);
+
   Future<String?> getAccessToken() async =>
       _sessionToken ?? await _storage.read(key: _accessTokenKey);
 
@@ -35,6 +40,9 @@ class SecureStorageService {
   Future<String?> readData(String key) => _storage.read(key: key);
 
   Future<void> deleteValue(String key) => _storage.delete(key: key);
+
+  /// Every stored key and value, for removing a group of keys by prefix.
+  Future<Map<String, String>> readAll() => _storage.readAll();
 
   Future<void> clearAll() async {
     _sessionToken = null;

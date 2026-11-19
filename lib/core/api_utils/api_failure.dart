@@ -46,8 +46,12 @@ class ApiFailure implements Exception {
     ApiFailureKind.notFound => 'The resource was not found.',
     ApiFailureKind.server =>
       'Something went wrong on our end. Please try again later.',
-    ApiFailureKind.parsing => 'Parsing error: $message',
-    ApiFailureKind.unknown => 'Unknown error: $message',
+    // Never show the raw exception: `message` keeps the details for logs, the
+    // user only needs something they can act on (Ziki #2704).
+    ApiFailureKind.parsing =>
+      'We could not read the response from the server. Please try again.',
+    ApiFailureKind.unknown =>
+      'Something went wrong. Please try again. If it keeps happening, contact support.',
     // 4xx client errors carry a structured server message safe to show (e.g. "Invalid credentials")
     ApiFailureKind.client => message,
   };

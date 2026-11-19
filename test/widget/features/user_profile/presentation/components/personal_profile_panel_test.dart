@@ -37,19 +37,22 @@ class _FakeAuth extends AuthNotifier {
       AuthState(status: AuthStatus.authenticated, user: _user());
 
   @override
-  Future<void> toggleOnlineStatus() async {
-    if (fails) return;
+  Future<PresenceToggleResult> toggleOnlineStatus() async {
+    if (fails) return const PresenceFailed('Status update failed');
     final online = !state.user!.status.online;
     state = AuthState(
       status: AuthStatus.authenticated,
       user: _user(online: online),
     );
+    return const PresenceConfirmed();
   }
 }
 
 Future<ProviderContainer> _pump(
   WidgetTester tester, {
   String username = 'hassanat',
+  String phoneNumber = '',
+  String avatarUrl = '',
   bool statusFails = false,
 }) async {
   tester.view.physicalSize = const Size(1400, 1000);
@@ -64,6 +67,8 @@ Future<ProviderContainer> _pump(
             email: 'hassanat@example.com',
             timezone: 'Africa/Lagos',
             username: username,
+            phoneNumber: phoneNumber,
+            avatarUrl: avatarUrl,
           ),
         ),
       ),
@@ -84,6 +89,12 @@ Future<ProviderContainer> _pump(
   );
   return container;
 }
+
+/// The copy icon in the contact row showing [label].
+Finder _copyIconBeside(String label) => find.descendant(
+  of: find.ancestor(of: find.text(label), matching: find.byType(Row)).first,
+  matching: find.byIcon(Icons.copy_outlined),
+);
 
 /// Taps [finder] and checks the toast, then lets the toast time out.
 Future<void> _tapAndExpectToast(
@@ -201,4 +212,133 @@ void main() {
     );
     expect(copied, 'hassanat@example.com');
   });
+
+  testWidgets('Contact rows copy the phone number and the email', (t) async {
+    String? copied;
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await _pump(t, phoneNumber: '+234 800 000 0000');
+
+    await _tapAndExpectToast(
+      t,
+      _copyIconBeside('+234 800 000 0000'),
+      'Copied +234 800 000 0000',
+    );
+    expect(copied, '+234 800 000 0000');
+
+    await _tapAndExpectToast(
+      t,
+      _copyIconBeside('hassanat@example.com'),
+      'Copied hassanat@example.com',
+    );
+    expect(copied, 'hassanat@example.com');
+  });
+
+  testWidgets('A phone row with no number offers nothing to copy', (t) async {
+    await _pump(t);
+    expect(find.text('Not provided'), findsOneWidget);
+    expect(_copyIconBeside('Not provided'), findsNothing);
+    expect(_copyIconBeside('hassanat@example.com'), findsOneWidget);
+  });
+
+  testWidgets('header close button has accessible tooltip and closes panel', (
+    t,
+  ) async {
+    final c = await _pump(t);
+    final closeBtn = find.byTooltip('Close');
+    expect(closeBtn, findsOneWidget);
+
+    final icon = find.descendant(
+      of: closeBtn,
+      matching: find.byIcon(Icons.close),
+    );
+    expect(icon, findsOneWidget);
+
+    await t.tap(closeBtn);
+    await t.pump();
+    expect(c.read(personalProfilePanelProvider), isFalse);
+  });
+
+  testWidgets('Renders image when avatarUrl is present', (t) async {
+    await _pump(t, avatarUrl: 'https://example.com/photo.png');
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.byIcon(Icons.person), findsNothing);
+  });
+
+  testWidgets('Renders initials fallback when avatarUrl is empty', (t) async {
+    await _pump(t, avatarUrl: '');
+    expect(find.text('AH'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets(
+    'desktop profile panel action buttons are wired and responsive (Ziki #147)',
+    (t) async {
+      final c = await _pump(t);
+
+      // Favourite button is omitted on your own profile
+      expect(find.byIcon(Icons.star_outline), findsNothing);
+
+      // Mute button pauses notifications and shows feedback toast
+      await _tapAndExpectToast(
+        t,
+        find.text('Mute'),
+        'Notifications paused for 1 hour',
+      );
+      expect(c.read(notificationSettingsProvider).isDndActive, isTrue);
+
+      // Unmute button resumes notifications and cancels the timer
+      await _tapAndExpectToast(t, find.text('Unmute'), 'Notifications resumed');
+      expect(c.read(notificationSettingsProvider).isDndActive, isFalse);
+
+      // Hide button toggles presence away
+      await _tapAndExpectToast(t, find.text('Hide'), 'You are now away');
+      expect(find.textContaining('Away'), findsOneWidget);
+
+      // Copy action copies handle to clipboard
+      String? copied;
+      t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await _tapAndExpectToast(
+        t,
+        find.byTooltip('Copy your username'),
+        'Copied @hassanat',
+      );
+      expect(copied, '@hassanat');
+
+      // View Files switches sidebar to files tab and closes panel
+      await t.tap(find.text('View Files'));
+      await t.pump();
+      expect(c.read(homeSidebarProvider), HomeSidebarType.files);
+      expect(c.read(personalProfilePanelProvider), isFalse);
+    },
+  );
 }

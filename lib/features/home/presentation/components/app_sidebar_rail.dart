@@ -7,6 +7,8 @@ class AppSidebarRail extends ConsumerStatefulWidget {
     required this.activeType,
     this.onTypeSelected,
     this.settingsSelected = false,
+    this.threadsSelected = false,
+    this.laterSelected = false,
   });
 
   static const double width = 50;
@@ -14,6 +16,8 @@ class AppSidebarRail extends ConsumerStatefulWidget {
   final HomeSidebarType? activeType;
   final ValueChanged<HomeSidebarType>? onTypeSelected;
   final bool settingsSelected;
+  final bool threadsSelected;
+  final bool laterSelected;
 
   @override
   ConsumerState<AppSidebarRail> createState() => _AppSidebarRailState();
@@ -57,6 +61,17 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
     ValueChanged<HomeSidebarType> select,
   ) {
     final colors = context.colors;
+    final conversations = ref.watch(
+      dmListProvider.select((state) => state.value ?? const <DmConversation>[]),
+    );
+    final deletedConversationIds = ref.watch(
+      dmConversationActionsProvider.select((state) => state.deletedIds),
+    );
+    final hasUnreadDms = conversations.any(
+      (conversation) =>
+          conversation.unreadCount > 0 &&
+          !deletedConversationIds.contains(conversation.channelId),
+    );
     return Container(
       width: AppSidebarRail.width,
       decoration: BoxDecoration(
@@ -91,6 +106,18 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
             onTap: () => select(HomeSidebarType.people),
           ),
           _RailNavItem(
+            icon: Icons.forum_outlined,
+            label: 'Threads',
+            isActive: widget.threadsSelected,
+            onTap: () => context.go(AppRouter.threads),
+          ),
+          _RailNavItem(
+            icon: Icons.bookmark_border,
+            label: 'Later',
+            isActive: widget.laterSelected,
+            onTap: () => context.go(AppRouter.later),
+          ),
+          _RailNavItem(
             icon: Icons.folder_open_outlined,
             label: 'Files',
             isActive: activeType == HomeSidebarType.files,
@@ -102,9 +129,19 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
           ),
           const Spacer(),
           _RailBottomIcon(
+            icon: Icons.inbox_outlined,
+            tooltip: 'Inbox',
+            onTap: () {
+              showDialog<void>(
+                context: context,
+                barrierColor: Colors.black.withValues(alpha: 0.3),
+                builder: (context) => const InboxDialog(),
+              );
+            },
+          ),
+          _RailBottomIcon(
             icon: Icons.notifications_none_outlined,
-            // No unread-count source yet; show the dot once there is one.
-            hasNotification: false,
+            hasNotification: hasUnreadDms,
             tooltip: 'Notifications',
             onTap: () {
               showDialog<void>(
@@ -117,6 +154,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
           _RailBottomIcon(
             icon: Icons.settings_outlined,
             selected: settingsSelected,
+            tooltip: 'Settings',
             onTap: () {
               context.go(AppRouter.profile);
             },
@@ -198,41 +236,43 @@ class _RailNavItemState extends State<_RailNavItem> {
         ? null
         : SidebarPopoutHost.of(context);
 
-    return InkWell(
-      onTap: widget.onTap,
-      onHover: popouts == null
-          ? null
-          : (hovered) => popouts.onRailHover(widget.popoutType!, hovered),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-        child: Column(
-          children: [
-            MouseRegion(
-              onEnter: (_) => setState(() => _hovered = true),
-              onExit: (_) => setState(() => _hovered = false),
-              child: Container(
-                key: widget.positionKey,
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: (widget.isActive || _hovered)
-                      ? colors.primary.withValues(alpha: 0.95)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(7),
+    return SizedBox(
+      width: double.infinity,
+      child: InkWell(
+        onTap: widget.onTap,
+        onHover: popouts == null
+            ? null
+            : (hovered) => popouts.onRailHover(widget.popoutType!, hovered),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+          child: Column(
+            children: [
+              MouseRegion(
+                onEnter: (_) => setState(() => _hovered = true),
+                onExit: (_) => setState(() => _hovered = false),
+                child: Container(
+                  key: widget.positionKey,
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: (widget.isActive || _hovered)
+                        ? colors.primary.withValues(alpha: 0.95)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Icon(widget.icon, color: colors.onPrimary, size: 20),
                 ),
-                child: Icon(widget.icon, color: colors.onPrimary, size: 18),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.label,
-              style: TextStyle(
-                color: colors.onPrimary.withValues(alpha: 0.92),
-                fontSize: 9,
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 4),
+              Text(
+                widget.label,
+                style: context.textTheme.labelSmall?.copyWith(
+                  color: colors.onPrimary.withValues(alpha: 0.92),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -275,13 +315,14 @@ class _RailBottomIcon extends StatelessWidget {
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(7),
               ),
-              child: Icon(icon, color: colors.onPrimary, size: 18),
+              child: Icon(icon, color: colors.onPrimary, size: 20),
             ),
             if (hasNotification)
               Positioned(
                 right: 6,
                 top: 6,
                 child: Container(
+                  key: const Key('notification-unread-indicator'),
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(

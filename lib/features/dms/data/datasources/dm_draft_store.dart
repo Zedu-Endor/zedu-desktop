@@ -39,14 +39,26 @@ class DmDraftStore extends ChangeNotifier {
   /// Channel ids already read from storage at least once.
   final Set<String> _loaded = {};
 
-  /// Counts in-memory changes made while a storage read may still be pending.
-  /// A late read must not replace a newer save or clear.
-  final Map<String, int> _mutationVersions = {};
-
   bool _disposed = false;
 
   DmDraftStore(this._storage, {required String userId, required String orgId})
-    : _keyPrefix = 'dm_draft_${userId}_${orgId}_';
+    : _keyPrefix = '${_userPrefix(userId)}${orgId}_';
+
+  static String _userPrefix(String userId) => 'dm_draft_${userId}_';
+
+  /// Deletes every draft [userId] saved on this computer, in every org and
+  /// conversation, so private unsent text doesn't outlive signing out.
+  static Future<void> deleteAllForUser(
+    SecureStorageService storage,
+    String userId,
+  ) async {
+    if (userId.isEmpty) return;
+    final prefix = _userPrefix(userId);
+    final stored = await storage.readAll();
+    for (final key in stored.keys.where((k) => k.startsWith(prefix))) {
+      await storage.deleteValue(key);
+    }
+  }
 
   @override
   void dispose() {
@@ -71,7 +83,6 @@ class DmDraftStore extends ChangeNotifier {
     _loaded.add(channelId);
     if (_cache.containsKey(channelId)) return _cache[channelId];
 
-    final mutationVersion = _mutationVersions[channelId] ?? 0;
     final raw = await _storage.readData('$_keyPrefix$channelId');
     DraftEntry? entry;
     if (raw != null) {
@@ -86,13 +97,6 @@ class DmDraftStore extends ChangeNotifier {
         entry = null;
       }
     }
-
-    // A save or clear may have completed while the storage read was pending.
-    // Keep its newer in-memory value instead of overwriting it with stale data.
-    if ((_mutationVersions[channelId] ?? 0) != mutationVersion) {
-      return _cache[channelId];
-    }
-
     _cache[channelId] = entry;
     _notify();
     return entry;
@@ -109,7 +113,6 @@ class DmDraftStore extends ChangeNotifier {
       text: text,
       updatedAt: updatedAt ?? DateTime.now().millisecondsSinceEpoch,
     );
-    _mutationVersions[channelId] = (_mutationVersions[channelId] ?? 0) + 1;
     _cache[channelId] = entry;
     _notify();
     try {
@@ -123,7 +126,6 @@ class DmDraftStore extends ChangeNotifier {
   }
 
   Future<void> clear(String channelId) async {
-    _mutationVersions[channelId] = (_mutationVersions[channelId] ?? 0) + 1;
     _cache[channelId] = null;
     _notify();
     try {

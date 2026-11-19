@@ -7,14 +7,15 @@ abstract interface class CreditsRemoteDataSource {
   Future<CreditUsageReportModel> getUsageReport(String orgId);
   Future<List<CreditTransactionModel>> getTransactions(String orgId);
   Future<CreditCheckoutModel> purchaseCredits({
-    required String planId,
+    String? packageId,
+    String? planId,
     required String email,
   });
   Future<void> verifyPayment({required String sessionId});
 }
 
 class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
-  const CreditsRemoteDataSourceImpl({
+  CreditsRemoteDataSourceImpl({
     required AppConfig config,
     required ApiBaseService apiBaseService,
   }) : _config = config,
@@ -22,6 +23,7 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
 
   final AppConfig _config;
   final ApiBaseService _api;
+  final Map<String, dynamic> _mockUsage = Map.of(_initialMockUsage);
 
   @override
   Future<List<CreditPackageModel>> getPackages() async {
@@ -47,11 +49,19 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
     if (_config.usesMockData) {
       return CreditUsageModel.fromJson(_mockUsage);
     }
+    // The workspace balance lives on the usage-report endpoint: /credits/usage
+    // returns a per-agent usage list (no balance) whose shape does not fit a
+    // Map cast, so the balance read from that route always failed.
     final response = await _api.get<Map<String, dynamic>>(
-      path: '/credits/usage/$orgId',
+      path: '/credits/usage-report/$orgId',
     );
-    return CreditUsageModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
+    final data = response.data['data'];
+    if (data is Map<String, dynamic>) return CreditUsageModel.fromJson(data);
+    // Surface the shape problem as a failure instead of reporting a fake,
+    // always-0 balance.
+    throw ApiFailure.fromParsingError(
+      'credits usage-report: expected a Map, got ${data.runtimeType}',
+      path: '/credits/usage-report/$orgId',
     );
   }
 
@@ -89,11 +99,13 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
 
   @override
   Future<CreditCheckoutModel> purchaseCredits({
-    required String planId,
+    String? packageId,
+    String? planId,
     required String email,
   }) async {
+    final effectivePackageId = packageId ?? planId ?? '';
     if (_config.usesMockData) {
-      final sessionId = 'cs_test_mock_${planId.hashCode.abs()}';
+      final sessionId = 'cs_test_mock_${effectivePackageId.hashCode.abs()}';
       return CreditCheckoutModel(
         checkoutSessionId: sessionId,
         checkoutSessionUrl:
@@ -102,11 +114,21 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
     }
     final response = await _api.post<Map<String, dynamic>>(
       path: '/credits/purchase',
-      data: {'plan_id': planId, 'email': email},
+      headers: {'Referer': _config.apiBaseUrl},
+      data: {
+        'package_id': effectivePackageId,
+        'plan_id': effectivePackageId,
+        'email': email,
+      },
     );
-    return CreditCheckoutModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
-    );
+    final data = response.data['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ApiFailure(
+        message: 'Invalid credit checkout response',
+        kind: ApiFailureKind.parsing,
+      );
+    }
+    return CreditCheckoutModel.fromJson(data);
   }
 
   @override
@@ -124,7 +146,7 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
   }
 }
 
-const _mockUsage = <String, dynamic>{
+const _initialMockUsage = <String, dynamic>{
   'balance': 10,
   'total_purchased': 10,
   'total_consumed': 0,

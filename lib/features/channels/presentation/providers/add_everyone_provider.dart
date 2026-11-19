@@ -112,7 +112,10 @@ class AddEveryoneToChannel {
   }
 
   AddEveryoneFailed _failed(ApiFailure error, String channelName) {
-    final message = error.message.trim();
+    final message = switch (error.kind) {
+      ApiFailureKind.unknown || ApiFailureKind.parsing => '',
+      _ => error.friendlyMessage.trim(),
+    };
     return AddEveryoneFailed(
       message.isEmpty
           ? 'Could not add everyone to #$channelName. Please try again.'

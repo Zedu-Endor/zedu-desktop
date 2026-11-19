@@ -20,6 +20,10 @@ class ToolbarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
+      // The toolbar row sits at the bottom of the composer, so a below
+      // tooltip lands on the window edge where it is clipped.
+      preferBelow: false,
+      verticalOffset: 4,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(5),

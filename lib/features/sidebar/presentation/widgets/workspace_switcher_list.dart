@@ -53,10 +53,13 @@ class WorkspaceSwitcherList extends ConsumerWidget {
                       icon: Icons.person_add_alt,
                       label: 'Invite',
                       onPressed: () {
-                        Navigator.pop(context);
+                        // Closing the menu deactivates this context, so open
+                        // the invite dialog from the navigator instead.
+                        final navigator = Navigator.of(context);
+                        navigator.pop();
                         showDialog<void>(
-                          context: context,
-                          builder: (context) => InviteTeammatesModal(),
+                          context: navigator.context,
+                          builder: (context) => const InviteTeammatesModal(),
                         );
                       },
                     ),
@@ -89,11 +92,19 @@ class WorkspaceSwitcherList extends ConsumerWidget {
                 return _WorkspaceListItem(
                   workspace: workspace,
                   isActive: isActive,
-                  onTap: () {
-                    ref
-                        .read(workspaceProvider.notifier)
-                        .switchWorkspace(workspace);
+                  onTap: () async {
+                    // Taken before the dialog closes, which unmounts this list.
+                    final notifier = ref.read(workspaceProvider.notifier);
+                    final overlay = Overlay.of(context, rootOverlay: true);
                     Navigator.pop(context);
+                    final error = await notifier.switchWorkspace(workspace);
+                    if (error != null) {
+                      AppToastService.showWith(
+                        overlay,
+                        type: AppToastType.error,
+                        message: error,
+                      );
+                    }
                   },
                 );
               },
@@ -148,7 +159,7 @@ class WorkspaceSwitcherList extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  workspace.channelsLabel,
+                  workspace.membersLabel,
                   style: TextStyle(color: colors.textHint, fontSize: 13),
                 ),
               ],
@@ -258,7 +269,7 @@ class _WorkspaceListItem extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      workspace.name.substring(0, 1).toUpperCase(),
+                      avatarInitial(workspace.name, fallback: 'W'),
                       style: TextStyle(
                         color: colors.onPrimary,
                         fontWeight: FontWeight.bold,
@@ -272,6 +283,11 @@ class _WorkspaceListItem extends StatelessWidget {
                     top: -6,
                     right: -6,
                     child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 5,
                         vertical: 2,
@@ -282,7 +298,7 @@ class _WorkspaceListItem extends StatelessWidget {
                         border: Border.all(color: colors.background, width: 2),
                       ),
                       child: Text(
-                        '${workspace.unreadCount}',
+                        workspace.unreadCount.unreadBadgeText,
                         style: TextStyle(
                           color: colors.onPrimary,
                           fontSize: 8,

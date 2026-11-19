@@ -7,11 +7,16 @@ abstract interface class UserProfileRemoteDataSource {
   Future<ProfileAccountModel> getAccount();
   Future<ProfileAccountModel> updateAccount(ProfileAccount account);
   Future<void> deleteAccount();
-  Future<NotificationPreferencesModel> getNotificationPreferences();
-  Future<NotificationPreferencesModel> updateNotificationPreferences(
-    NotificationPreferences preferences,
-  );
-  Future<List<SecuritySessionModel>> getSecuritySessions();
+  Future<NotificationPreferencesModel> getNotificationPreferences({
+    required String? orgId,
+  });
+  Future<NotificationPreferencesModel> updateNotificationPreferences({
+    required String? orgId,
+    required NotificationPreferences preferences,
+  });
+  Future<List<SecuritySessionModel>> getSecuritySessions({
+    required String userId,
+  });
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -26,7 +31,7 @@ abstract interface class UserProfileRemoteDataSource {
     OrganizationProfile organization, {
     String? orgId,
   });
-  Future<void> deleteOrganization({String? orgId});
+  Future<void> deleteOrganization({required String orgId});
   Future<List<TeamMemberModel>> getTeamMembers({String? orgId});
   Future<TeamMemberModel> inviteMember({
     required String email,
@@ -35,7 +40,7 @@ abstract interface class UserProfileRemoteDataSource {
   });
   Future<TeamMemberModel> updateMember(TeamMember member);
   Future<void> removeMember(String memberId);
-  Future<List<RolePermissionModel>> getRolesAndPermissions();
+  Future<List<RolePermissionModel>> getRolesAndPermissions({String? orgId});
   Future<BillingInfoModel> getBillingInfo();
 }
 
@@ -55,7 +60,7 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   Future<ProfileAccountModel> getAccount() async {
     if (_config.usesMockData) return ProfileAccountModel.fromJson(_account);
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/account',
+      path: '/profile',
     );
     return ProfileAccountModel.fromJson(
       response.data['data'] as Map<String, dynamic>,
@@ -70,15 +75,27 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
     }
     // Same endpoint and multipart fields as Zedu web. Empty values are left
     // out so fields the user didn't change are never overwritten.
-    final fields = <String, String>{
-      'full_name': account.name,
-      'display_name': account.displayName,
-      'username': account.username,
-      'phone': account.phoneNumber,
-      'title': account.title,
-      'timezone': account.timezone,
-      'name_pronounciation': account.namePronunciation,
-    }..removeWhere((_, value) => value.isEmpty);
+    // Same endpoint and multipart fields as Zedu web. Fields marked with
+    // kUnchangedField (and empty required fields) are omitted from the
+    // payload so they are not overwritten. Cleared optional fields (empty
+    // strings) are sent so the backend clears them.
+    final fields =
+        <String, String>{
+          'full_name': account.name,
+          'display_name': account.displayName,
+          'username': account.username,
+          'phone': account.phoneNumber,
+          'title': account.title,
+          'timezone': account.timezone,
+          'name_pronounciation': account.namePronunciation,
+        }..removeWhere((key, value) {
+          if (value == kUnchangedField) return true;
+          if (value.isEmpty &&
+              (key == 'full_name' || key == 'username' || key == 'timezone')) {
+            return true;
+          }
+          return false;
+        });
     await _apiBaseService.patch<Map<String, dynamic>>(
       path: '/profile',
       data: FormData.fromMap(fields),
@@ -89,61 +106,187 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   @override
   Future<void> deleteAccount() async {
     if (_config.usesMockData) return;
-    await _apiBaseService.delete<Map<String, dynamic>>(
-      path: '/profile/account',
-    );
+    // There is no DELETE /profile/account on the API; deactivating your own
+    // account is DELETE /users/me (DeactivateSelfUser), so the old path 404'd
+    // and the delete action could never succeed (Ziki #584).
+    await _apiBaseService.delete<Map<String, dynamic>>(path: '/users/me');
   }
 
   @override
-  Future<NotificationPreferencesModel> getNotificationPreferences() async {
+  Future<NotificationPreferencesModel> getNotificationPreferences({
+    required String? orgId,
+  }) async {
     if (_config.usesMockData) {
-      return NotificationPreferencesModel.fromJson(_notifications);
-    }
-    final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/notifications',
-    );
-    return NotificationPreferencesModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
-    );
-  }
-
-  @override
-  Future<NotificationPreferencesModel> updateNotificationPreferences(
-    NotificationPreferences preferences,
-  ) async {
-    if (_config.usesMockData) {
-      return NotificationPreferencesModel(
-        mode: preferences.mode,
-        fromTime: preferences.fromTime,
-        toTime: preferences.toTime,
-        useDesktopSettings: preferences.useDesktopSettings,
-        emailNotifications: preferences.emailNotifications,
+      return NotificationPreferencesModel.fromDeviceJson(
+        _notifications,
+        mobile: _notifications,
+        timezone: _account['timezone'],
       );
     }
-    final response = await _apiBaseService.patch<Map<String, dynamic>>(
-      path: '/profile/notifications',
-      data: NotificationPreferencesModel(
-        mode: preferences.mode,
-        fromTime: preferences.fromTime,
-        toTime: preferences.toTime,
-        useDesktopSettings: preferences.useDesktopSettings,
-        emailNotifications: preferences.emailNotifications,
-      ).toJson(),
+    final org = _requireOrg(orgId);
+    final results = await Future.wait([
+      _getDevicePreferences(org, 'desktop'),
+      // Mobile and timezone only add detail, so the screen still loads
+      // without them.
+      _orNull(_getDevicePreferences(org, 'mobile')),
+      _orNull(_getProfileTimezone()),
+      _readMobileOverride(org),
+    ]);
+    final model = NotificationPreferencesModel.fromDeviceJson(
+      results[0] as Map<String, dynamic>,
+      mobile: results[1] as Map<String, dynamic>?,
+      timezone: results[2] as String?,
     );
-    return NotificationPreferencesModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
-    );
+    if (results[3] != true || model.differentMobileSettings) return model;
+    return model.copyWithModel(differentMobileSettings: true);
   }
 
   @override
-  Future<List<SecuritySessionModel>> getSecuritySessions() async {
+  Future<NotificationPreferencesModel> updateNotificationPreferences({
+    required String? orgId,
+    required NotificationPreferences preferences,
+  }) async {
+    if (_config.usesMockData) {
+      return NotificationPreferencesModel.fromDeviceJson(
+        NotificationPreferencesModel.toDeviceJson(
+          preferences,
+          deviceType: 'desktop',
+        ),
+        timezone: preferences.timezone,
+      ).copyWithModel(
+        differentMobileSettings: preferences.differentMobileSettings,
+      );
+    }
+    final org = _requireOrg(orgId);
+    final desktop = await _saveDevicePreferences(org, 'desktop', preferences);
+    // With one shared setting, the phone follows whatever is saved here.
+    if (!preferences.differentMobileSettings) {
+      await _saveDevicePreferences(org, 'mobile', preferences);
+    }
+    await _writeMobileOverride(org, preferences.differentMobileSettings);
+    return NotificationPreferencesModel.fromDeviceJson(
+      desktop,
+      timezone: preferences.timezone,
+    ).copyWithModel(
+      differentMobileSettings: preferences.differentMobileSettings,
+    );
+  }
+
+  Future<T?> _orNull<T>(Future<T> request) async {
+    try {
+      return await request;
+    } catch (error) {
+      AppLogger.w('Optional notification request failed - $error', tag: _tag);
+      return null;
+    }
+  }
+
+  String _requireOrg(String? orgId) {
+    if (orgId == null || orgId.isEmpty) {
+      throw const ApiFailure(
+        message: 'Select a workspace to manage its notifications.',
+        kind: ApiFailureKind.client,
+      );
+    }
+    return orgId;
+  }
+
+  Future<Map<String, dynamic>> _getDevicePreferences(
+    String orgId,
+    String deviceType,
+  ) async {
+    final response = await _apiBaseService.get<Map<String, dynamic>>(
+      path: '/organisations/$orgId/notification-preference',
+      queryParameters: {'device_type': deviceType},
+    );
+    return response.data['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> _saveDevicePreferences(
+    String orgId,
+    String deviceType,
+    NotificationPreferences preferences,
+  ) async {
+    final response = await _apiBaseService.post<Map<String, dynamic>>(
+      path: '/organisations/$orgId/notification-preference',
+      queryParameters: {'device_type': deviceType},
+      data: NotificationPreferencesModel.toDeviceJson(
+        preferences,
+        deviceType: deviceType,
+      ),
+    );
+    return response.data['data'] as Map<String, dynamic>;
+  }
+
+  /// The backend evaluates the schedule in the profile timezone.
+  Future<String?> _getProfileTimezone() async {
+    final response = await _apiBaseService.get<Map<String, dynamic>>(
+      path: '/profile',
+    );
+    final data = response.data['data'];
+    return data is Map<String, dynamic> ? data['timezone'] as String? : null;
+  }
+
+  // The backend has no field for "mobile has its own settings", so the choice
+  // is remembered on this device. Mobile settings that differ also count.
+  static String _mobileOverrideKey(String orgId) =>
+      'notification_mobile_override_$orgId';
+
+  // Users carry `full_name`; fall back to the username, then the email, so a
+  // member without a profile name is still recognisable.
+  static String _displayName(Map<String, dynamic> user) {
+    String? nonEmpty(Object? value) {
+      final text = value is String ? value.trim() : '';
+      return text.isEmpty ? null : text;
+    }
+
+    final email = nonEmpty(user['email']);
+    return nonEmpty(user['full_name']) ??
+        nonEmpty(user['name']) ??
+        nonEmpty(user['username']) ??
+        email?.split('@').first ??
+        'Unknown';
+  }
+
+  Future<bool> _readMobileOverride(String orgId) async {
+    if (!locator.isRegistered<SecureStorageService>()) return false;
+    try {
+      final value = await locator<SecureStorageService>().readData(
+        _mobileOverrideKey(orgId),
+      );
+      return value == 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _writeMobileOverride(String orgId, bool value) async {
+    if (!locator.isRegistered<SecureStorageService>()) return;
+    try {
+      await locator<SecureStorageService>().writeData(
+        _mobileOverrideKey(orgId),
+        '$value',
+      );
+    } catch (error) {
+      AppLogger.w('Could not remember mobile override - $error', tag: _tag);
+    }
+  }
+
+  @override
+  Future<List<SecuritySessionModel>> getSecuritySessions({
+    required String userId,
+  }) async {
     if (_config.usesMockData) {
       return _sessions.map(SecuritySessionModel.fromJson).toList();
     }
+    // zedu-be serves the sessions at GET /users/:user_id/sessions; there is
+    // no /profile/security/sessions route.
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/security/sessions',
+      path: '/users/$userId/sessions',
     );
-    final data = response.data['data'] as List<dynamic>;
+    // No sessions comes back as 204 with no data.
+    final data = response.data['data'];
+    if (data is! List) return const [];
     return data
         .cast<Map<String, dynamic>>()
         .map(SecuritySessionModel.fromJson)
@@ -255,12 +398,12 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<void> deleteOrganization({String? orgId}) async {
+  Future<void> deleteOrganization({required String orgId}) async {
     if (_config.usesMockData) return;
-    // Delete the workspace that is shown, not whichever organisation the
-    // profile endpoint resolves to.
+    // The API has no /profile/organization route, so an organisation can only
+    // be deleted by id.
     await _apiBaseService.delete<Map<String, dynamic>>(
-      path: orgId == null ? '/profile/organization' : '/organisations/$orgId',
+      path: '/organisations/$orgId',
     );
   }
 
@@ -280,7 +423,13 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
             loadedTeamMembers = decoded
                 .map((e) => TeamMemberModel.fromJson(e as Map<String, dynamic>))
                 .toList();
-          } catch (_) {}
+          } catch (error) {
+            AppLogger.w(
+              'Could not parse cached team members for org $orgId',
+              tag: _tag,
+              error: error,
+            );
+          }
         }
       }
 
@@ -309,9 +458,9 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       return list;
     }
 
-    if (orgId == null || orgId.length < 36) {
-      orgId = '019700db-4e22-7f90-a20e-f9116291ef24';
-    }
+    // With no workspace selected there are no members to show; never fall
+    // back to another organisation's members (Ziki #1452).
+    if (orgId == null || orgId.isEmpty) return [];
 
     try {
       final response = await _apiBaseService.get<Map<String, dynamic>>(
@@ -327,11 +476,9 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
           email: user['email'] as String? ?? '',
           role: user['role'] as String? ?? 'User',
           dateJoined: user['created_at'] as String? ?? '',
-          status: TeamMemberStatus.active, // Or parse from user['status']
-          name:
-              user['name'] as String? ??
-              user['username'] as String? ??
-              'Unknown',
+          // Pending invites and deactivated members come back here too.
+          status: TeamMemberModel.statusFromJson(user),
+          name: _displayName(user),
           avatarUrl: user['avatar_url'] as String?,
         );
       }).toList();
@@ -363,6 +510,8 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         'emails': [email],
         'role_id': role,
       },
+      // zedu-be builds the emailed link as Referer + 'accept_org_invitation?..'.
+      headers: {'Referer': '${_config.webBaseUrl}/'},
     );
     final data = response.data['data'] as Map<String, dynamic>;
     final invites = data['invitations'] as List<dynamic>? ?? [];
@@ -373,19 +522,20 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
             invite['id'] as String? ??
             DateTime.now().millisecondsSinceEpoch.toString(),
         email: invite['email'] as String? ?? email,
-        role: role,
+        // Prefer the role name the backend echoes back so the member table
+        // never has to fall back to the raw `role_id` UUID.
+        role: invite['role_name'] as String? ?? role,
         dateJoined: invite['sent_at'] as String? ?? 'Pending',
         status: TeamMemberStatus.pending,
         name: email.split('@').first,
       );
     }
-    return TeamMemberModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      email: email,
-      role: role,
-      dateJoined: 'Pending',
-      status: TeamMemberStatus.pending,
-      name: email.split('@').first,
+    // A successful HTTP response can still contain rejected/duplicate emails.
+    // Only announce an invitation when the server confirms it in invitations.
+    throw const ApiFailure(
+      message:
+          'The server did not confirm this invitation. Refresh invitations before retrying.',
+      kind: ApiFailureKind.client,
     );
   }
 
@@ -420,17 +570,25 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<List<RolePermissionModel>> getRolesAndPermissions() async {
+  Future<List<RolePermissionModel>> getRolesAndPermissions({
+    String? orgId,
+  }) async {
     if (_config.usesMockData) {
       return _roles.map(RolePermissionModel.fromJson).toList();
     }
+    // The API serves an organisation's roles at /organisations/{orgId}/roles;
+    // /profile/organization/roles does not exist (#720).
+    // With no organisation selected there are no roles to show.
+    if (orgId == null || orgId.isEmpty) return const [];
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/organization/roles',
+      path: '/organisations/$orgId/roles',
     );
-    final data = response.data['data'] as List<dynamic>;
+    final data = response.data['data'] as List<dynamic>? ?? const [];
     return data
-        .cast<Map<String, dynamic>>()
-        .map(RolePermissionModel.fromJson)
+        .whereType<Map<dynamic, dynamic>>()
+        .map(
+          (role) => RolePermissionModel.fromJson(role.cast<String, dynamic>()),
+        )
         .toList();
   }
 
@@ -454,12 +612,10 @@ const _account = {
   'timezone': 'Africa/Lagos',
 };
 
-const _notifications = {
-  'mode': 'allMessages',
-  'from_time': '12:00 AM',
-  'to_time': '11:00 PM',
-  'use_desktop_settings': true,
-  'email_notifications': false,
+const _notifications = <String, dynamic>{
+  'notify_about': 'all_new_messages',
+  'send_mail': false,
+  'time_range': NotificationPreferencesModel.allDay,
 };
 
 const _organization = {

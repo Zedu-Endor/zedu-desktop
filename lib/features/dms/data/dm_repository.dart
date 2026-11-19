@@ -1,13 +1,42 @@
+import 'dart:collection';
 import 'dart:math' show Random;
 
 import 'package:zedu/core/core.dart';
-
-import '../domain/dm_conversation.dart';
+import 'package:zedu/features/features.dart';
 
 final dmRepositoryProvider = Provider<DmRepository>((ref) {
   final apiClient = locator<ApiBaseService>();
   return DmRepository(apiClient);
 });
+
+class DmConversationsPage with ListMixin<DmConversation> {
+  final List<DmConversation> conversations;
+  final int currentPage;
+  final int totalPages;
+  final int totalItems;
+
+  const DmConversationsPage({
+    required this.conversations,
+    required this.currentPage,
+    required this.totalPages,
+    this.totalItems = 0,
+  });
+
+  @override
+  int get length => conversations.length;
+
+  @override
+  set length(int newLength) => conversations.length = newLength;
+
+  @override
+  DmConversation operator [](int index) => conversations[index];
+
+  @override
+  void operator []=(int index, DmConversation value) =>
+      conversations[index] = value;
+
+  bool get hasMore => currentPage < totalPages;
+}
 
 class DmRepository {
   static const int pageSize = 20;
@@ -16,7 +45,7 @@ class DmRepository {
 
   DmRepository(this._apiClient);
 
-  Future<List<DmConversation>> getConversations({
+  Future<DmConversationsPage> getConversations({
     required String orgId,
     int page = 1,
     bool recentDm = false,
@@ -41,7 +70,28 @@ class DmRepository {
 
     list.sort((a, b) => b.lastActivityAt.compareTo(a.lastActivityAt));
 
-    return list;
+    var pagination = data['pagination'];
+    if (pagination is List) {
+      pagination = pagination.isEmpty ? null : pagination.first;
+    }
+    int? value(String key) => pagination is Map
+        ? num.tryParse(pagination[key]?.toString() ?? '')?.toInt()
+        : null;
+
+    final currentPage = value('current_page') ?? page;
+    final totalPages =
+        value('total_pages') ??
+        value('total_pages_count') ??
+        (list.length >= pageSize ? currentPage + 1 : currentPage);
+    final totalItems =
+        value('total_items') ?? (page - 1) * pageSize + list.length;
+
+    return DmConversationsPage(
+      conversations: list,
+      currentPage: currentPage < 1 ? 1 : currentPage,
+      totalPages: totalPages < 1 ? 1 : totalPages,
+      totalItems: totalItems < 0 ? 0 : totalItems,
+    );
   }
 
   /// Removes the DM from the caller's list on the server. The other
@@ -53,6 +103,21 @@ class DmRepository {
     await _apiClient.delete<Map<String, dynamic>>(
       path: '/organisations/$orgId/dms/$channelId',
     );
+  }
+
+  /// Searches the whole history of one conversation on the server, not just
+  /// the messages loaded on screen.
+  Future<List<ConversationSearchHit>> searchMessages({
+    required String channelId,
+    required String query,
+  }) async {
+    final trimmed = query.trim();
+    if (channelId.isEmpty || trimmed.isEmpty) return const [];
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      path: '/search/channel/$channelId',
+      queryParameters: {'query': trimmed, 'sortBy': 'relevance'},
+    );
+    return ConversationSearchHit.fromResponse(response.data['data']);
   }
 
   Future<List<Map<String, dynamic>>> getMessages(
@@ -209,15 +274,27 @@ class DmRepository {
     );
   }
 
+  /// Pins a message for everyone in the conversation, through the route the
+  /// web app uses for channels and DMs alike.
+  Future<void> pinMessage({
+    required String threadId,
+    required String channelId,
+  }) async {
+    await _apiClient.post<Map<String, dynamic>>(
+      path: '/channels/pin/$channelId/thread',
+      data: {'thread_id': threadId},
+    );
+  }
+
   Future<void> editMessage(
-    String channelId, {
+    String messageId, {
     required String content,
     String? threadId,
     List<Map<String, dynamic>>? media,
     List<Map<String, dynamic>>? mentions,
   }) async {
     await _apiClient.put<Map<String, dynamic>>(
-      path: '/dms/messages/$channelId',
+      path: '/dms/messages/$messageId',
       data: {
         'content': content,
         ...?(threadId != null ? {'thread_id': threadId} : null),

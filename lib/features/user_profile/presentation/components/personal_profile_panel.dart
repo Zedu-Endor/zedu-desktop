@@ -55,6 +55,7 @@ class PersonalProfilePanel extends ConsumerWidget {
                 ),
                 const Spacer(),
                 IconButton(
+                  tooltip: 'Close',
                   onPressed: () {
                     ref.read(personalProfilePanelProvider.notifier).state =
                         false;
@@ -79,16 +80,43 @@ class PersonalProfilePanel extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Avatar
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: colors.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Icon(Icons.person, size: 80, color: colors.accent),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final url = account.avatarUrl?.trim() ?? '';
+                      final fallback = Center(
+                        child: account.initials.isNotEmpty
+                            ? Text(
+                                account.initials,
+                                style: TextStyle(
+                                  fontSize: 56,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.accent,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 80,
+                                color: colors.accent,
+                              ),
+                      );
+
+                      return Container(
+                        width: 160,
+                        height: 160,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: colors.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: url.isEmpty
+                            ? fallback
+                            : Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => fallback,
+                              ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
 
@@ -236,6 +264,7 @@ class PersonalProfilePanel extends ConsumerWidget {
                         : 'Not provided',
                     colors: colors,
                     context: context,
+                    canCopy: account.phoneNumber.isNotEmpty,
                   ),
                   const SizedBox(height: 8),
 
@@ -246,6 +275,7 @@ class PersonalProfilePanel extends ConsumerWidget {
                     colors: colors,
                     context: context,
                     isLink: true,
+                    canCopy: account.email.isNotEmpty,
                   ),
                 ],
               ),
@@ -319,8 +349,12 @@ class PersonalProfilePanel extends ConsumerWidget {
     WidgetRef ref,
     ProfileAccount account,
   ) {
-    showEditProfileDialog(context, account, (updated) {
-      ref.read(userProfileNotifierProvider.notifier).updateAccount(updated);
+    showEditProfileDialog(context, account, (updated) async {
+      await ref
+          .read(userProfileNotifierProvider.notifier)
+          .updateAccount(updated);
+      // updateAccount clears the error when it starts and sets it on failure.
+      return ref.read(userProfileNotifierProvider).error;
     });
   }
 }
@@ -344,31 +378,35 @@ class _ActionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            border: Border.all(color: colors.divider),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: colors.textSecondary),
-              if (label.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: colors.textSecondary,
-                    fontWeight: FontWeight.w500,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.divider),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: colors.textSecondary),
+                if (label.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -382,6 +420,7 @@ class _ContactRow extends StatelessWidget {
     required this.label,
     required this.colors,
     required this.context,
+    required this.canCopy,
     this.isLink = false,
   });
 
@@ -390,6 +429,19 @@ class _ContactRow extends StatelessWidget {
   final AppPalette colors;
   final BuildContext context;
   final bool isLink;
+
+  /// False when [label] is a placeholder, which isn't worth copying.
+  final bool canCopy;
+
+  Future<void> _copy(BuildContext buildContext) async {
+    await Clipboard.setData(ClipboardData(text: label));
+    if (!buildContext.mounted) return;
+    AppToastService.show(
+      buildContext,
+      type: AppToastType.success,
+      message: 'Copied $label',
+    );
+  }
 
   @override
   Widget build(BuildContext buildContext) {
@@ -408,11 +460,12 @@ class _ContactRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        InkWell(
-          onTap: () {},
-          borderRadius: BorderRadius.circular(4),
-          child: Icon(Icons.copy_outlined, size: 14, color: colors.textHint),
-        ),
+        if (canCopy)
+          InkWell(
+            onTap: () => _copy(buildContext),
+            borderRadius: BorderRadius.circular(4),
+            child: Icon(Icons.copy_outlined, size: 14, color: colors.textHint),
+          ),
       ],
     );
   }

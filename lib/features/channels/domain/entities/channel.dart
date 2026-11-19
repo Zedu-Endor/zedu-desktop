@@ -9,6 +9,7 @@ class Channel {
   final int unreadCount;
   final int membersCount;
   final String? topic;
+  final bool hasAccess;
 
   Channel({
     required this.id,
@@ -21,9 +22,20 @@ class Channel {
     this.unreadCount = 0,
     this.membersCount = 0,
     this.topic,
+    this.hasAccess = true,
   });
 
   factory Channel.fromJson(Map<String, dynamic> json) {
+    final rawAccess = json['access'];
+    final bool hasAccess;
+    if (rawAccess is bool) {
+      hasAccess = rawAccess;
+    } else if (rawAccess is String) {
+      hasAccess = rawAccess.toLowerCase() == 'true';
+    } else {
+      hasAccess = true;
+    }
+
     return Channel(
       // The server sends a channel's id as `channels_id` in the channel list.
       id: (json['channels_id'] ?? json['id']) as String? ?? '',
@@ -36,6 +48,7 @@ class Channel {
       topic: json['topic'] as String?,
       unreadCount: json['unread_count'] as int? ?? 0,
       membersCount: json['members_count'] as int? ?? 0,
+      hasAccess: hasAccess,
     );
   }
 
@@ -51,6 +64,7 @@ class Channel {
       'topic': topic,
       'unread_count': unreadCount,
       'members_count': membersCount,
+      'access': hasAccess,
     };
   }
 
@@ -65,6 +79,7 @@ class Channel {
     int? unreadCount,
     int? membersCount,
     String? topic,
+    bool? hasAccess,
   }) {
     return Channel(
       id: id ?? this.id,
@@ -77,6 +92,7 @@ class Channel {
       unreadCount: unreadCount ?? this.unreadCount,
       membersCount: membersCount ?? this.membersCount,
       topic: topic ?? this.topic,
+      hasAccess: hasAccess ?? this.hasAccess,
     );
   }
 }

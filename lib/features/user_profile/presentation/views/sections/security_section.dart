@@ -11,7 +11,7 @@ class SecuritySection extends StatelessWidget {
 
   final List<SecuritySession> sessions;
   final bool isSaving;
-  final Future<void> Function({
+  final Future<Result<void>> Function({
     required String currentPassword,
     required String newPassword,
   })
@@ -48,6 +48,15 @@ class _SessionsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (sessions.isEmpty) {
+      return const ProfileCard(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(child: Text('No active sessions found')),
+        ),
+      );
+    }
+
     return ProfileCard(
       padding: EdgeInsets.zero,
       child: SingleChildScrollView(
@@ -55,7 +64,7 @@ class _SessionsTable extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 800),
           child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFFFAFAFA)),
+            headingRowColor: WidgetStateProperty.all(context.colors.background),
             columns: const [
               DataColumn(label: Text('Device')),
               DataColumn(label: Text('Location')),

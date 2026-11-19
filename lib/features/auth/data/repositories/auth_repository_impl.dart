@@ -11,6 +11,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
   static const _tag = 'AuthRepository';
 
+  static const _invalidCredentialsMessage =
+      'Invalid email or password. Please check your credentials and try again.';
+
   @override
   Future<Result<AuthSession>> login({
     required String email,
@@ -29,11 +32,29 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     } on ApiFailure catch (failure) {
       AppLogger.w('Login failed — ${failure.message}', tag: _tag);
-      return Failure(failure);
+      return Failure(_hideCredentialDetail(failure));
     } catch (error) {
       AppLogger.e('Unexpected login error', tag: _tag, error: error);
       return Failure(ApiFailure.unknown(error));
     }
+  }
+
+  /// A rejected credential check must not say which half was wrong, or the
+  /// login form becomes a tool for confirming which emails have accounts.
+  /// 400 and 401 are the wrong-password answers and 404 is this backend's
+  /// "no account for that email" signal, as magic_link_request_view.dart
+  /// documents. Rate limits and server faults keep their own copy, because
+  /// that copy tells the user what to do next. The client kind is the one
+  /// whose message is shown verbatim, so the generic text has to carry it.
+  static ApiFailure _hideCredentialDetail(ApiFailure failure) {
+    final code = failure.statusCode;
+    if (code != 400 && code != 401 && code != 404) return failure;
+    return ApiFailure(
+      message: _invalidCredentialsMessage,
+      statusCode: code,
+      path: failure.path,
+      kind: ApiFailureKind.client,
+    );
   }
 
   @override
@@ -235,6 +256,21 @@ class AuthRepositoryImpl implements AuthRepository {
       return Failure(failure);
     } catch (error) {
       AppLogger.e('Unexpected status update error', tag: _tag, error: error);
+      return Failure(ApiFailure.unknown(error));
+    }
+  }
+
+  @override
+  Future<Result<void>> setPresence({required bool online}) async {
+    try {
+      await _remote.setPresence(online: online);
+      AppLogger.i('Presence updated — online=$online', tag: _tag);
+      return const Success(null);
+    } on ApiFailure catch (failure) {
+      AppLogger.w('Presence update failed — ${failure.message}', tag: _tag);
+      return Failure(failure);
+    } catch (error) {
+      AppLogger.e('Unexpected presence update error', tag: _tag, error: error);
       return Failure(ApiFailure.unknown(error));
     }
   }

@@ -12,8 +12,12 @@ class _ForgotPasswordViewState extends ConsumerState<ForgotPasswordView> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
 
+  late final _loginLink = TapGestureRecognizer()
+    ..onTap = () => context.go(AppRouter.login);
+
   @override
   void dispose() {
+    _loginLink.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -56,36 +60,10 @@ class _ForgotPasswordViewState extends ConsumerState<ForgotPasswordView> {
         backgroundColor: context.colors.background,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Image.asset('assets/pngs/zedu_logo.png', width: 83, height: 31),
-              Text.rich(
-                TextSpan(
-                  text: 'Remember your password? ',
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: context.colors.textPrimary,
-                    fontFamily: FontFamily.roboto,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: 'Sign in',
-                      style: context.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w400,
-                        color: context.colors.primary,
-                        fontFamily: FontFamily.roboto,
-                      ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => context.go(AppRouter.login),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        title: AuthHeaderRow(
+          prompt: 'Remember your password? ',
+          action: 'Sign in',
+          recognizer: _loginLink,
         ),
       ),
       body: SingleChildScrollView(

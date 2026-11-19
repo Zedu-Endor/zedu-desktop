@@ -56,6 +56,14 @@ class _AppTextFieldState extends State<AppTextField> {
   }
 
   @override
+  void didUpdateWidget(covariant AppTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPassword != oldWidget.isPassword) {
+      obscureText = widget.isPassword;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final toggleLabel = obscureText ? 'Show password' : 'Hide password';
@@ -76,6 +84,8 @@ class _AppTextFieldState extends State<AppTextField> {
                 : const SizedBox.shrink()),
         const SizedBox(height: 6),
         Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
           onFocusChange: (hasFocus) {
             if (!hasFocus) {
               widget.onFocusLostOrSubmitted?.call();
@@ -114,6 +124,14 @@ class _AppTextFieldState extends State<AppTextField> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
                 borderSide: BorderSide(color: context.colors.primary),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: context.colors.error),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: context.colors.error),
               ),
               prefixIcon: widget.prefix != null
                   ? Row(

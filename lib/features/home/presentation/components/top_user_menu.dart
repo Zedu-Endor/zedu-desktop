@@ -20,8 +20,11 @@ class TopUserMenu extends ConsumerWidget {
             context.go(AppRouter.buyCredits);
           }
         } else if (value == 'profile') {
-          // Toggle the personal profile panel overlay
+          // Toggle the personal profile panel overlay and ensure home route is active
           ref.read(personalProfilePanelProvider.notifier).state = true;
+          if (context.mounted) {
+            context.go(AppRouter.home);
+          }
         } else if (value == 'preferences') {
           if (context.mounted) {
             context.go(AppRouter.profile);

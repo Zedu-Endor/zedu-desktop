@@ -34,6 +34,26 @@ void main() {
       expect(await SecureStorageService().getAccessToken(), isNull);
     });
 
+    test('replacing a remembered token keeps it remembered', () async {
+      final service = SecureStorageService();
+      await service.saveAccessToken('old-token');
+
+      await service.replaceAccessToken('new-token');
+
+      expect(await service.getAccessToken(), 'new-token');
+      expect(await SecureStorageService().getAccessToken(), 'new-token');
+    });
+
+    test('replacing a token that is not remembered stays in memory', () async {
+      final service = SecureStorageService();
+      await service.saveAccessToken('old-token', persist: false);
+
+      await service.replaceAccessToken('new-token');
+
+      expect(await service.getAccessToken(), 'new-token');
+      expect(await SecureStorageService().getAccessToken(), isNull);
+    });
+
     test('deleting clears the in-memory token too', () async {
       final service = SecureStorageService();
       await service.saveAccessToken('token-1', persist: false);

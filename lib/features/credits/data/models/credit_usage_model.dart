@@ -16,10 +16,14 @@ class CreditUsageModel extends CreditUsage {
       totalPurchased:
           (json['total_purchased'] as num?)?.toInt() ??
           (json['purchased'] as num?)?.toInt() ??
+          // The usage-report endpoint answers with these aliases.
+          (json['total_credited'] as num?)?.toInt() ??
           0,
       totalConsumed:
           (json['total_consumed'] as num?)?.toInt() ??
           (json['consumed'] as num?)?.toInt() ??
+          // The usage-report endpoint answers with these aliases.
+          (json['total_used'] as num?)?.toInt() ??
           0,
     );
   }

@@ -5,3 +5,4 @@ export 'security_session.dart';
 export 'team_member.dart';
 export 'role_permission.dart';
 export 'billing_info.dart';
+export 'bulk_invitation.dart';

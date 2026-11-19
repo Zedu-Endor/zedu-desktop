@@ -21,10 +21,17 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
     6,
     (_) => TextEditingController(),
   );
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  late final List<FocusNode> _focusNodes = List.generate(
+    6,
+    (index) => FocusNode(onKeyEvent: (_, event) => _onCodeKey(index, event)),
+  );
 
   Timer? _timer;
   int _secondsLeft = 300;
+
+  /// True while a resend request is in flight, so a second click cannot send
+  /// another email.
+  bool _resending = false;
 
   @override
   void initState() {
@@ -33,9 +40,16 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
   }
 
   void _startTimer() {
+    if (!mounted) return;
     setState(() => _secondsLeft = 300);
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Pop the view mid-countdown and a later tick would still fire; without
+      // this guard the callback calls setState() after dispose and crashes.
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_secondsLeft > 0) {
         setState(() => _secondsLeft--);
       } else {
@@ -56,6 +70,21 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
     }
     _timer?.cancel();
     super.dispose();
+  }
+
+  /// Backspace in an empty code box clears the previous box and moves back to
+  /// it. `onChanged` does not fire for a box that is already empty, so this is
+  /// the only way to keep walking back after the last digit was cleared.
+  KeyEventResult _onCodeKey(int index, KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.backspace ||
+        index == 0 ||
+        _tokenControllers[index].text.isNotEmpty) {
+      return KeyEventResult.ignored;
+    }
+    _tokenControllers[index - 1].clear();
+    _focusNodes[index - 1].requestFocus();
+    return KeyEventResult.handled;
   }
 
   Future<void> _onResetPasswordPressed() async {
@@ -91,19 +120,29 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
   }
 
   Future<void> _onResendCodePressed() async {
-    if (_secondsLeft > 0) return;
+    if (_secondsLeft > 0 || _resending) return;
+    setState(() => _resending = true);
 
     // Trigger forgot password again to resend code
-    final success = await ref
-        .read(authNotifierProvider.notifier)
-        .forgotPassword(email: widget.email);
-    if (success && mounted) {
-      AppToastService.show(
-        context,
-        type: AppToastType.success,
-        message: 'New code sent to your email.',
-      );
-      _startTimer();
+    try {
+      final success = await ref
+          .read(authNotifierProvider.notifier)
+          .forgotPassword(email: widget.email);
+      if (success && mounted) {
+        // The old code no longer works, so its digits should not stay.
+        for (final controller in _tokenControllers) {
+          controller.clear();
+        }
+        _focusNodes.first.requestFocus();
+        AppToastService.show(
+          context,
+          type: AppToastType.success,
+          message: 'New code sent to your email.',
+        );
+        _startTimer();
+      }
+    } finally {
+      if (mounted) setState(() => _resending = false);
     }
   }
 
@@ -270,6 +309,7 @@ class _ResetPasswordViewState extends ConsumerState<ResetPasswordView> {
                         label: 'Confirm new password',
                         hint: 'Confirm new Password',
                         textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _onResetPasswordPressed(),
                         validator: (value) {
                           if (value != _newPasswordController.text) {
                             return 'Passwords do not match';

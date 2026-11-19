@@ -14,8 +14,12 @@ class _LoginViewState extends ConsumerState<LoginView> {
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
 
+  late final _signUpLink = TapGestureRecognizer()
+    ..onTap = () => context.push(AppRouter.signup);
+
   @override
   void dispose() {
+    _signUpLink.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -29,7 +33,9 @@ class _LoginViewState extends ConsumerState<LoginView> {
         .read(authNotifierProvider.notifier)
         .login(
           email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
+          // Sent as typed: trimming would change a password that was set
+          // with a leading or trailing space.
+          password: _passwordController.text,
           rememberMe: _rememberMe,
         );
   }
@@ -46,7 +52,9 @@ class _LoginViewState extends ConsumerState<LoginView> {
         );
         context.go(AppRouter.home);
       }
-      if (next.error != null && previous?.error != next.error) {
+      if (next.error != null &&
+          previous?.error != next.error &&
+          !next.sessionRestoreFailed) {
         AppToastService.show(
           context,
           type: AppToastType.error,
@@ -67,42 +75,20 @@ class _LoginViewState extends ConsumerState<LoginView> {
       );
     }
 
+    if (authState.sessionRestoreFailed) {
+      return _SessionRetryScreen(message: authState.error);
+    }
+
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
         toolbarHeight: 80,
         backgroundColor: context.colors.background,
         elevation: 0,
-        title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Image.asset('assets/pngs/zedu_logo.png', width: 83, height: 31),
-              Text.rich(
-                TextSpan(
-                  text: "Don't have an account? ",
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: context.colors.textPrimary,
-                    fontFamily: FontFamily.roboto,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: 'Sign up',
-                      style: context.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w400,
-                        color: context.colors.primary,
-                        fontFamily: FontFamily.roboto,
-                      ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => context.push(AppRouter.signup),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        title: AuthHeaderRow(
+          prompt: "Don't have an account? ",
+          action: 'Sign up',
+          recognizer: _signUpLink,
         ),
       ),
       body: SingleChildScrollView(
@@ -127,8 +113,9 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   icon: 'assets/svgs/google_logo.svg',
                   label: 'Sign in with Google',
                   loading: authState.isLoading,
-                  onPressed: () =>
-                      ref.read(authNotifierProvider.notifier).loginWithGoogle(),
+                  onPressed: () => ref
+                      .read(authNotifierProvider.notifier)
+                      .loginWithGoogle(rememberMe: _rememberMe),
                 ),
                 context.gapV(12),
                 SocialAuthButton(
@@ -175,65 +162,78 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   ),
                 ),
                 context.gapV(26),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppTextField(
-                        controller: _emailController,
-                        label: 'Email address',
-                        hint: 'Enter your email address',
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        validator: (value) =>
-                            Validators.validateEmail(context, value),
-                      ),
-                      context.gapV(16),
-                      AppTextField(
-                        isPassword: true,
-                        controller: _passwordController,
-                        label: 'Password',
-                        hint: 'Password',
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _onLoginPressed(),
-                        validator: (value) => Validators.validateRequired(
-                          context,
-                          value?.trim(),
-                          fieldName: 'Password',
+                AutofillGroup(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AppTextField(
+                          controller: _emailController,
+                          autofillHints: const [
+                            AutofillHints.username,
+                            AutofillHints.email,
+                          ],
+                          label: 'Email address',
+                          hint: 'Enter your email address',
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          validator: (value) =>
+                              Validators.validateEmail(context, value),
                         ),
-                      ),
-                      context.gapV(8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: _rememberMe,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _rememberMe = value ?? false;
-                                  });
-                                },
-                              ),
-                              const Text('Remember me'),
-                            ],
+                        context.gapV(16),
+                        AppTextField(
+                          isPassword: true,
+                          controller: _passwordController,
+                          autofillHints: const [AutofillHints.password],
+                          label: 'Password',
+                          hint: 'Password',
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _onLoginPressed(),
+                          validator: (value) => Validators.validateRequired(
+                            context,
+                            value?.trim(),
+                            fieldName: 'Password',
                           ),
-                          GestureDetector(
-                            onTap: () => context.push(AppRouter.forgotPassword),
-                            child: Text(
-                              'Forgot Password?',
-                              style: context.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: context.colors.primary,
-                                fontFamily: FontFamily.roboto,
+                        ),
+                        context.gapV(8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Remember me'),
+                              ],
+                            ),
+                            GestureDetector(
+                              onTap: () =>
+                                  context.push(AppRouter.forgotPassword),
+                              child: Text(
+                                'Forgot Password?',
+                                style: context.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w400,
+                                  color: context.colors.primary,
+                                  fontFamily: FontFamily.roboto,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 context.gapV(18),
@@ -244,7 +244,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
                 ),
                 context.gapV(12),
                 Align(
-                  alignment: Alignment.topLeft,
+                  alignment: Alignment.center,
                   child: InkWell(
                     onTap: () => context.go(AppRouter.magicLinkRequest),
                     child: Text(
@@ -275,6 +275,62 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   ],
                 ),
                 context.gapV(32),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown instead of the login form when the saved session may still be valid
+/// but the server could not be reached to check it.
+class _SessionRetryScreen extends ConsumerWidget {
+  const _SessionRetryScreen({this.message});
+
+  final String? message;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
+    final notifier = ref.read(authNotifierProvider.notifier);
+
+    return Scaffold(
+      backgroundColor: colors.background,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off, size: 40, color: colors.textHint),
+                const SizedBox(height: 16),
+                Text(
+                  "Can't reach Zedu",
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    message!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: colors.textSecondary),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                AppButton(
+                  label: 'Retry',
+                  onPressed: notifier.retrySessionRestore,
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: notifier.showLoginForm,
+                  child: const Text('Log in with a password instead'),
+                ),
               ],
             ),
           ),

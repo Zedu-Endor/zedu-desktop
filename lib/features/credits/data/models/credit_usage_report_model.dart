@@ -14,10 +14,14 @@ class CreditUsageReportModel extends CreditUsageReport {
       purchased:
           (json['purchased'] as num?)?.toInt() ??
           (json['total_purchased'] as num?)?.toInt() ??
+          // The report endpoint answers with these aliases.
+          (json['total_credited'] as num?)?.toInt() ??
           0,
       consumed:
           (json['consumed'] as num?)?.toInt() ??
           (json['total_consumed'] as num?)?.toInt() ??
+          // The report endpoint answers with these aliases.
+          (json['total_used'] as num?)?.toInt() ??
           0,
       periodLabel: json['period_label'] as String? ?? 'This month',
     );
