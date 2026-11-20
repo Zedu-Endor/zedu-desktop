@@ -3,9 +3,10 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../../helpers/helpers.dart';
 
-Widget buildUnderTest(List<TeamMember> members) {
+Widget buildUnderTest(List<TeamMember> members, {ThemeData? theme}) {
   return ProviderScope(
     child: MaterialApp(
+      theme: theme,
       home: Scaffold(
         body: SingleChildScrollView(
           child: UserManagementSection(
@@ -46,6 +47,57 @@ void main() {
     expect(find.text('Invite multiple people'), findsOneWidget);
     expect(find.text('Members'), findsOneWidget);
     expect(find.text('Invites'), findsOneWidget);
+  });
+
+  testWidgets('centres the Previous and Next labels in their buttons (#173)', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // More members than one page holds, so the pagination row appears. The
+    // app theme matters here: its outlined-button padding is what crowded the
+    // labels.
+    await tester.pumpWidget(
+      buildUnderTest(createMembers(15), theme: AppTheme.light),
+    );
+    await tester.pumpAndSettle();
+
+    final paddings = <EdgeInsetsGeometry?>[];
+    for (final label in ['Previous', 'Next']) {
+      final text = find.text(label);
+      final button = find.ancestor(
+        of: text,
+        matching: find.byType(OutlinedButton),
+      );
+      expect(button, findsOneWidget);
+
+      final buttonRect = tester.getRect(button);
+      final textRect = tester.getRect(text);
+      // The padding the button really uses: its own style, else the theme's.
+      final padding =
+          (tester.widget<OutlinedButton>(button).style?.padding ??
+                  Theme.of(
+                    tester.element(button),
+                  ).outlinedButtonTheme.style?.padding)
+              ?.resolve(<WidgetState>{});
+      // The label gets a full line of height, inside the button's padding.
+      // The theme's 18px top and bottom filled the whole 36px button, so the
+      // label was laid out 0px tall and spilled out off-centre.
+      expect(textRect.height, greaterThanOrEqualTo(14), reason: label);
+      expect(
+        textRect.height + (padding?.vertical ?? 0),
+        lessThanOrEqualTo(buttonRect.height),
+        reason: label,
+      );
+      expect(
+        (textRect.center.dy - buttonRect.center.dy).abs(),
+        lessThanOrEqualTo(1),
+        reason: label,
+      );
+      paddings.add(padding);
+    }
+    // Both buttons are padded the same way.
+    expect(paddings.toSet(), hasLength(1));
   });
 
   group('UserManagementSection role filter (Ziki #2389)', () {
