@@ -49,7 +49,7 @@ void main() {
     expect(find.text('Invites'), findsOneWidget);
   });
 
-  testWidgets('centres the Previous and Next labels in their buttons (#173)', (
+  testWidgets('centres the pagination button labels in their buttons (#173)', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1600));
@@ -63,7 +63,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final paddings = <EdgeInsetsGeometry?>[];
-    for (final label in ['Previous', 'Next']) {
+    for (final label in ['Previous', 'Go', 'Next']) {
       final text = find.text(label);
       final button = find.ancestor(
         of: text,
@@ -96,7 +96,7 @@ void main() {
       );
       paddings.add(padding);
     }
-    // Both buttons are padded the same way.
+    // All three buttons are padded the same way.
     expect(paddings.toSet(), hasLength(1));
   });
 

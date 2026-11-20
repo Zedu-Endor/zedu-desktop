@@ -44,7 +44,8 @@ class _UserManagementSectionState extends State<UserManagementSection> {
   // The theme's button padding (24 x 18) is sized for 57px buttons: in these
   // 36px pagination buttons the top and bottom padding left the label no
   // height, so it spilled out off-centre (Ziki #173). Pad sideways only, the
-  // same for Previous and Next; colours and border still come from the theme.
+  // same for Previous, Go and Next; colours and border still come from the
+  // theme.
   static final _paginationButtonStyle = OutlinedButton.styleFrom(
     padding: const EdgeInsets.symmetric(horizontal: 16),
   );
@@ -492,6 +493,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                                 'user_management_page_jump_button',
                               ),
                               label: 'Go',
+                              style: _paginationButtonStyle,
                               expand: false,
                               height: 36,
                               onPressed: () => _jumpToPage(
