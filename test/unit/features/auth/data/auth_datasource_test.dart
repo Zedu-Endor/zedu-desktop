@@ -187,10 +187,14 @@ void main() {
 
     group('sendMagicLink', () {
       test('calls POST /auth/magick-link with email payload', () async {
+        // The server builds the emailed link from Referer, so the app sends
+        // its own scheme: the link then opens Zedu instead of a dead page.
+        const headers = {'Referer': MagicLinkDeepLinkParser.emailLinkBase};
         when(
           () => mockApi.post<Map<String, dynamic>>(
             path: '/auth/magick-link',
             data: {'email': 'magic@example.com'},
+            headers: headers,
           ),
         ).thenAnswer(
           (_) async => ApiResponseModel<Map<String, dynamic>>(
@@ -213,6 +217,7 @@ void main() {
           () => mockApi.post<Map<String, dynamic>>(
             path: '/auth/magick-link',
             data: {'email': 'magic@example.com'},
+            headers: headers,
           ),
         ).called(1);
       });

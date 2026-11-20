@@ -3,6 +3,8 @@
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
 
+#include <string>
+
 #include "flutter_window.h"
 #include "utils.h"
 
@@ -51,6 +53,46 @@ bool ClaimSingleInstance() {
   }
   return false;
 }
+
+bool SetRegistryString(HKEY key, const wchar_t *name,
+                       const std::wstring &value) {
+  return ::RegSetValueExW(
+             key, name, 0, REG_SZ,
+             reinterpret_cast<const BYTE *>(value.c_str()),
+             static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t))) ==
+         ERROR_SUCCESS;
+}
+
+// Points zedu:// links, such as the magic-link sign-in email, at this copy of
+// Zedu. app_links only receives links; it doesn't register the scheme. This
+// writes under HKEY_CURRENT_USER, so no admin rights are needed, and it runs on
+// every launch so the link follows the app if it is moved or updated.
+void RegisterZeduScheme() {
+  wchar_t exe_path[MAX_PATH];
+  const DWORD length = ::GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+  if (length == 0 || length == MAX_PATH) {
+    return;
+  }
+
+  HKEY scheme_key;
+  if (::RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\zedu", 0,
+                        nullptr, 0, KEY_WRITE, nullptr, &scheme_key,
+                        nullptr) != ERROR_SUCCESS) {
+    return;
+  }
+  SetRegistryString(scheme_key, nullptr, L"URL:Zedu");
+  SetRegistryString(scheme_key, L"URL Protocol", L"");
+
+  HKEY command_key;
+  if (::RegCreateKeyExW(scheme_key, L"shell\\open\\command", 0, nullptr, 0,
+                        KEY_WRITE, nullptr, &command_key,
+                        nullptr) == ERROR_SUCCESS) {
+    SetRegistryString(command_key, nullptr,
+                      L"\"" + std::wstring(exe_path) + L"\" \"%1\"");
+    ::RegCloseKey(command_key);
+  }
+  ::RegCloseKey(scheme_key);
+}
 #endif
 
 }  // namespace
@@ -61,6 +103,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   if (!ClaimSingleInstance()) {
     return EXIT_SUCCESS;
   }
+  RegisterZeduScheme();
 #endif
 
   // Attach to console when present (e.g., 'flutter run') or create a

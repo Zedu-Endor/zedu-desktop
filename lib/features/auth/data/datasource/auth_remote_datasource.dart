@@ -239,6 +239,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await _apiBaseService.post<Map<String, dynamic>>(
         path: '/auth/magick-link',
         data: {'email': email},
+        // The server builds the emailed link from Referer; this makes it a
+        // zedu:// link that opens the app (Ziki #81).
+        headers: {'Referer': MagicLinkDeepLinkParser.emailLinkBase},
       );
     } on ApiFailure {
       rethrow;
