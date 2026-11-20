@@ -171,6 +171,29 @@ void main() {
       });
     });
 
+    test(
+      'shows the login form when the keyring cannot be opened (#228)',
+      () async {
+        // libsecret on Linux fails when the keyring is locked, the unlock
+        // prompt is cancelled, or no keyring service is running. The error
+        // comes back over the platform channel, so the read's future fails.
+        when(() => storage.getAccessToken()).thenAnswer(
+          (_) async => throw PlatformException(
+            code: 'Libsecret error',
+            message: 'Failed to unlock the keyring',
+          ),
+        );
+
+        final state = await restoreSession();
+
+        expect(state.status, AuthStatus.unauthenticated);
+        expect(state.error, isNotNull);
+        expect(state.sessionRestoreFailed, isFalse);
+        verifyNever(() => repository.getCurrentUser());
+        verifyNever(() => storage.deleteAccessToken());
+      },
+    );
+
     test('deletes the saved token when /auth/me returns 401', () async {
       givenSavedTokenAndFailure(
         const ApiFailure(

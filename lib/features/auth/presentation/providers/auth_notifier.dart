@@ -105,6 +105,10 @@ class AuthNotifier extends Notifier<AuthState> {
 
   static const _tag = 'AuthNotifier';
 
+  static const _keyringUnavailableMessage =
+      "Couldn't open your system keyring, so your saved sign-in can't be "
+      'used. Sign in to continue.';
+
   /// Shown once when a 401 ends a signed-in session.
   static const sessionExpiredMessage =
       'Your session has expired. Please sign in again.';
@@ -293,7 +297,26 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> _restoreSession() async {
     AppLogger.d('Restoring session from storage', tag: _tag);
-    final token = await _storage.getAccessToken();
+    final String? token;
+    try {
+      token = await _storage.getAccessToken();
+    } catch (error) {
+      // The keyring couldn't be opened (locked, prompt cancelled, or no
+      // keyring service on Linux). Show the login form instead of leaving the
+      // status unknown, which kept the startup spinner running forever
+      // (Ziki #228). Retrying wouldn't help, so this isn't a restore failure;
+      // signing in still works, keeping the token for this run if it can't
+      // be saved (_saveSessionToken).
+      AppLogger.w(
+        'Could not read the saved session from the keyring - $error',
+        tag: _tag,
+      );
+      state = const AuthState(
+        status: AuthStatus.unauthenticated,
+        error: _keyringUnavailableMessage,
+      );
+      return;
+    }
     if (token == null) {
       AppLogger.i('No stored token — unauthenticated', tag: _tag);
       state = const AuthState(status: AuthStatus.unauthenticated);
